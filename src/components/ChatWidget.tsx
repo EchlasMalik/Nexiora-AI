@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, Send, Sparkles, X } from 'lucide-react'
 import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot } from '@/lib/ai'
+import type { SuggestedQuestion } from '@/entities'
 import { cn } from '@/lib/utils'
 
 interface ChatWidgetMessage extends ChatTurn {
@@ -106,6 +107,21 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
       setStreamingText('')
       abortRef.current = null
     }
+  }
+
+  function handleSuggestedQuestion(qa: SuggestedQuestion) {
+    if (isResponding) return
+    if (!qa.answer.trim()) {
+      sendMessage(qa.question)
+      return
+    }
+    // A fixed answer is set — show it instantly rather than round-tripping
+    // through the AI, same as if the business had scripted this reply.
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: 'user', content: qa.question },
+      { id: crypto.randomUUID(), role: 'assistant', content: qa.answer },
+    ])
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -217,13 +233,13 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
 
         {messages.length <= 1 && chatbot.suggested_questions?.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
-            {chatbot.suggested_questions.map((question) => (
+            {chatbot.suggested_questions.map((qa) => (
               <button
-                key={question}
-                onClick={() => sendMessage(question)}
+                key={qa.question}
+                onClick={() => handleSuggestedQuestion(qa)}
                 className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
               >
-                {question}
+                {qa.question}
               </button>
             ))}
           </div>

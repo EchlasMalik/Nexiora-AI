@@ -37,6 +37,12 @@ export type ChatbotPosition = z.infer<typeof ChatbotPositionEnum>
 export const ChatbotStatusEnum = z.enum(['active', 'paused', 'draft'])
 export type ChatbotStatus = z.infer<typeof ChatbotStatusEnum>
 
+export const SuggestedQuestionSchema = z.object({
+  question: z.string().min(1),
+  answer: z.string().optional().default(''),
+})
+export type SuggestedQuestion = z.infer<typeof SuggestedQuestionSchema>
+
 export const ChatbotInputSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   company_name: z.string().optional().default(''),
@@ -46,7 +52,7 @@ export const ChatbotInputSchema = z.object({
   welcome_message: z.string().optional().default(''),
   theme_color: z.string().default('#7C3AED'),
   avatar_url: z.string().optional().default(''),
-  suggested_questions: z.array(z.string()).default([]),
+  suggested_questions: z.array(SuggestedQuestionSchema).default([]),
   embed_id: z.string().optional().default(''),
   position: ChatbotPositionEnum.default('bottom-right'),
   powered_by_branding: z.boolean().default(true),

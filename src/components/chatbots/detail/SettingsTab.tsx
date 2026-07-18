@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
-import { ChatbotRepo, type Chatbot, type ChatbotPosition } from '@/entities'
+import { ChatbotRepo, type Chatbot, type ChatbotPosition, type SuggestedQuestion } from '@/entities'
 import { CHATBOT_THEME_COLORS } from '@/lib/themeColors'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { SuggestedQuestionsEditor } from '../SuggestedQuestionsEditor'
 
 interface SettingsForm {
   name: string
@@ -56,6 +57,9 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
   })
   const [brandingSaved, setBrandingSaved] = useState(false)
 
+  const [suggestedQuestions, setSuggestedQuestions] = useState<SuggestedQuestion[]>(chatbot.suggested_questions)
+  const [questionsSaved, setQuestionsSaved] = useState(false)
+
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -86,6 +90,16 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
       queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
       setBrandingSaved(true)
       setTimeout(() => setBrandingSaved(false), 2500)
+    },
+  })
+
+  const questionsMutation = useMutation({
+    mutationFn: () => ChatbotRepo.update(orgId!, chatbot.id, { suggested_questions: suggestedQuestions }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['chatbot', orgId, chatbot.id], updated)
+      queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
+      setQuestionsSaved(true)
+      setTimeout(() => setQuestionsSaved(false), 2500)
     },
   })
 
@@ -274,6 +288,25 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
               {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
             </Button>
             {brandingSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Suggested questions</CardTitle>
+          <CardDescription>
+            Quick-tap buttons shown when a chat starts. Give one a fixed answer to skip the AI for that
+            question, or leave it blank to let the AI answer from your knowledge base.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <SuggestedQuestionsEditor value={suggestedQuestions} onChange={setSuggestedQuestions} />
+          <div className="flex items-center gap-3">
+            <Button type="button" onClick={() => questionsMutation.mutate()} disabled={questionsMutation.isPending}>
+              {questionsMutation.isPending ? 'Saving…' : 'Save questions'}
+            </Button>
+            {questionsSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
           </div>
         </CardContent>
       </Card>

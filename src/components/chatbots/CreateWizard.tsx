@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useOrg } from '@/contexts/OrgContext'
-import { ChatbotRepo, type ChatbotTone, type Chatbot } from '@/entities'
+import { ChatbotRepo, type ChatbotTone, type Chatbot, type SuggestedQuestion } from '@/entities'
 import { Button } from '@/components/ui/button'
 import { StepIdentity } from './wizard/StepIdentity'
 import { StepBusiness } from './wizard/StepBusiness'
@@ -15,7 +15,7 @@ export interface WizardDraft {
   name: string
   welcome_message: string
   theme_color: string
-  suggested_questions: string[]
+  suggested_questions: SuggestedQuestion[]
   company_name: string
   business_description: string
   industry: string
