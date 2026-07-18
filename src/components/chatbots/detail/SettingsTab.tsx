@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Check } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
-import { ChatbotRepo, type Chatbot } from '@/entities'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { ChatbotRepo, type Chatbot, type ChatbotPosition } from '@/entities'
+import { CHATBOT_THEME_COLORS } from '@/lib/themeColors'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface SettingsForm {
   name: string
@@ -20,9 +25,16 @@ interface SettingsForm {
   booking_url: string
 }
 
+interface BrandingForm {
+  theme_color: string
+  position: ChatbotPosition
+  avatar_url: string
+}
+
 export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
   const { orgId } = useOrg()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [form, setForm] = useState<SettingsForm>({
     name: chatbot.name,
@@ -37,9 +49,24 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
   })
   const [justSaved, setJustSaved] = useState(false)
 
+  const [branding, setBranding] = useState<BrandingForm>({
+    theme_color: chatbot.theme_color,
+    position: chatbot.position,
+    avatar_url: chatbot.avatar_url,
+  })
+  const [brandingSaved, setBrandingSaved] = useState(false)
+
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   function update(patch: Partial<SettingsForm>) {
     setForm((prev) => ({ ...prev, ...patch }))
     setJustSaved(false)
+  }
+
+  function updateBranding(patch: Partial<BrandingForm>) {
+    setBranding((prev) => ({ ...prev, ...patch }))
+    setBrandingSaved(false)
   }
 
   const saveMutation = useMutation({
@@ -51,6 +78,36 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
       setTimeout(() => setJustSaved(false), 2500)
     },
   })
+
+  const brandingMutation = useMutation({
+    mutationFn: () => ChatbotRepo.update(orgId!, chatbot.id, branding),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['chatbot', orgId, chatbot.id], updated)
+      queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
+      setBrandingSaved(true)
+      setTimeout(() => setBrandingSaved(false), 2500)
+    },
+  })
+
+  async function handleDelete() {
+    if (!deleteArmed) {
+      setDeleteArmed(true)
+      toast.warning('Click again to permanently delete this chatbot — this cannot be undone.')
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      await ChatbotRepo.remove(orgId!, chatbot.id)
+      queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
+      toast.success(`${chatbot.name} was deleted.`)
+      navigate('/dashboard/chatbots', { replace: true })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete chatbot')
+      setDeleteArmed(false)
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -154,6 +211,87 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
         </Button>
         {justSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Branding</CardTitle>
+          <CardDescription>How this chatbot looks when it's embedded on your site.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label>Theme color</Label>
+            <div className="flex flex-wrap gap-3">
+              {CHATBOT_THEME_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => updateBranding({ theme_color: color })}
+                  aria-label={`Select color ${color}`}
+                  className="flex size-9 items-center justify-center rounded-full transition-transform hover:scale-110"
+                  style={{ backgroundColor: color }}
+                >
+                  {branding.theme_color.toLowerCase() === color.toLowerCase() && (
+                    <Check className="size-4 text-white" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Widget position</Label>
+            <div className="flex gap-2">
+              {(['bottom-right', 'bottom-left'] as const).map((position) => (
+                <button
+                  key={position}
+                  type="button"
+                  onClick={() => updateBranding({ position })}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-sm font-medium capitalize transition-colors',
+                    branding.position === position
+                      ? 'border-violet-600 bg-violet-600 text-white'
+                      : 'border-border bg-white text-brand-text-secondary hover:border-violet-300'
+                  )}
+                >
+                  {position.replace('-', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="settings-avatar">Avatar URL</Label>
+            <Input
+              id="settings-avatar"
+              value={branding.avatar_url}
+              onChange={(e) => updateBranding({ avatar_url: e.target.value })}
+              placeholder="https://your-cdn.com/avatar.png"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button type="button" onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
+              {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
+            </Button>
+            {brandingSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="text-destructive">Danger zone</CardTitle>
+          <CardDescription>
+            Permanently delete {chatbot.name} and everything tied to it — conversations, contacts, appointments,
+            and its knowledge base. This cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? 'Deleting…' : deleteArmed ? 'Click again to confirm' : `Delete ${chatbot.name}`}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

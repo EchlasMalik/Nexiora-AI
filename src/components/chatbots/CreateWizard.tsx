@@ -70,6 +70,12 @@ export function CreateWizard({ onClose }: { onClose: () => void }) {
         embed_id: generateEmbedId(),
       }),
     onSuccess: (chatbot) => {
+      // Prime the caches ChatbotDetail reads on mount with data we already
+      // have, instead of letting it re-fetch what we just created — the
+      // extra round trip is what makes "create" feel like it takes two
+      // loading spinners instead of one.
+      queryClient.setQueryData(['chatbot', orgId, chatbot.id], chatbot)
+      queryClient.setQueryData(['knowledge-documents', orgId, chatbot.id], [])
       queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
       navigate(`/dashboard/chatbots/${chatbot.id}`)
     },

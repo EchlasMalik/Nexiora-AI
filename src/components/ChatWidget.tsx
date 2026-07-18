@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, X } from 'lucide-react'
+import { MessageCircle, Send, Sparkles, X } from 'lucide-react'
 import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot } from '@/lib/ai'
 import { cn } from '@/lib/utils'
 
@@ -123,7 +123,7 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
         className="fixed right-6 bottom-6 z-50 flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-transform hover:scale-105"
         style={{ backgroundColor: themeColor }}
       >
-        <Sparkles className="size-6" />
+        <MessageCircle className="size-6" />
       </button>
     )
   }

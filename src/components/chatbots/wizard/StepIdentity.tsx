@@ -4,18 +4,8 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { CHATBOT_THEME_COLORS } from '@/lib/themeColors'
 import type { WizardDraft } from '../CreateWizard'
-
-const THEME_COLORS = [
-  '#7c3aed',
-  '#2563eb',
-  '#db2777',
-  '#059669',
-  '#ea580c',
-  '#0891b2',
-  '#dc2626',
-  '#4f46e5',
-]
 
 interface StepIdentityProps {
   draft: WizardDraft
@@ -71,7 +61,7 @@ export function StepIdentity({ draft, updateDraft }: StepIdentityProps) {
       <div className="flex flex-col gap-2">
         <Label>Theme color</Label>
         <div className="flex flex-wrap gap-3">
-          {THEME_COLORS.map((color) => (
+          {CHATBOT_THEME_COLORS.map((color) => (
             <button
               key={color}
               type="button"
