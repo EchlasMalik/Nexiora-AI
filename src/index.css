@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 1rem;
+
+  /* Nexiora AI brand palette */
+  --brand-violet: #7c3aed;
+  --brand-violet-secondary: #6d28d9;
+  --brand-navy: #0f172a;
+  --brand-dark-bg: #020617;
+  --brand-light-bg: #f8fafc;
+  --brand-card: #ffffff;
+  --brand-border: #e2e8f0;
+  --brand-text-primary: #0f172a;
+  --brand-text-secondary: #64748b;
+  --brand-hover: #8b5cf6;
+  --brand-success: #10b981;
+  --brand-warning: #f59e0b;
+  --brand-danger: #ef4444;
+
+  --background: var(--brand-light-bg);
+  --foreground: var(--brand-text-primary);
+  --card: var(--brand-card);
+  --card-foreground: var(--brand-text-primary);
+  --popover: var(--brand-card);
+  --popover-foreground: var(--brand-text-primary);
+  --primary: var(--brand-violet);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-violet-secondary);
+  --secondary-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: var(--brand-text-secondary);
+  --accent: var(--brand-violet);
+  --accent-foreground: #ffffff;
+  --destructive: var(--brand-danger);
+  --destructive-foreground: #ffffff;
+  --success: var(--brand-success);
+  --warning: var(--brand-warning);
+  --border: var(--brand-border);
+  --input: var(--brand-border);
+  --ring: #c4b5fd;
+}
+
+.dark {
+  --background: var(--brand-dark-bg);
+  --foreground: #ffffff;
+  --card: #0f172a;
+  --card-foreground: #ffffff;
+  --popover: #0f172a;
+  --popover-foreground: #ffffff;
+  --primary: var(--brand-violet);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-violet-secondary);
+  --secondary-foreground: #ffffff;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: var(--brand-violet);
+  --accent-foreground: #ffffff;
+  --destructive: var(--brand-danger);
+  --destructive-foreground: #ffffff;
+  --success: var(--brand-success);
+  --warning: var(--brand-warning);
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: var(--brand-violet);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-violet-secondary: var(--brand-violet-secondary);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-dark-bg: var(--brand-dark-bg);
+  --color-brand-light-bg: var(--brand-light-bg);
+  --color-brand-hover: var(--brand-hover);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-logo: "Space Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .btn-gradient {
+    @apply bg-gradient-to-r from-violet-600 to-violet-800 text-white transition-all duration-200 hover:from-violet-500 hover:to-violet-700;
+  }
+}

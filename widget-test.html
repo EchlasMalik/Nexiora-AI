@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Third-party site — Nexiora widget smoke test</title>
+  <style>
+    body { font-family: sans-serif; background: #fefce8; padding: 40px; }
+    h1 { color: #a16207; }
+    /* Deliberately hostile styles to prove the shadow DOM isolates the widget */
+    * { box-sizing: content-box !important; }
+    button { all: unset !important; }
+  </style>
+</head>
+<body>
+  <h1>Not Nexiora — just a random customer's website</h1>
+  <p>If the widget bubble appears bottom-right and looks correct despite this page's aggressive global CSS, isolation is working.</p>
+
+  <script src="http://localhost:4173/widget.js" data-chatbot-id="bot_8yc7mh3e6r" async></script>
+</body>
+</html>
