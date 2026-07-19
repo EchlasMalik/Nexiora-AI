@@ -1,7 +1,7 @@
 import { BadgeCheck, Globe2, Lock, Zap } from 'lucide-react'
 
 const badges = [
-  { icon: Zap, label: 'Powered by Claude AI' },
+  { icon: Zap, label: 'Advanced conversational AI' },
   { icon: Lock, label: 'Isolated, private data per account' },
   { icon: Globe2, label: 'Replies in your visitor’s language' },
   { icon: BadgeCheck, label: 'GDPR-ready data export & deletion' },
