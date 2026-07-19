@@ -8,8 +8,17 @@
 // Every real exchange is persisted as a Conversation + Message rows (keyed
 // by chatbot_id + the widget's stable per-browser sessionId as visitor_id),
 // so it shows up in the dashboard inbox exactly like a conversation started
-// from anywhere else — this endpoint used to just stream a reply and forget
-// it ever happened.
+// from anywhere else.
+//
+// Everything before and after the Claude call — the chatbot lookup, both
+// rate-limit checks, logging the attempt, finding/creating the conversation,
+// persisting the visitor's message, the billing gate, and the spend-cap
+// check — runs as one round trip via the `public_chat_gate` RPC instead of
+// eight separate queries. The two post-reply writes (usage log + assistant
+// message) are similarly batched into `public_chat_complete`. The actual
+// gating thresholds and fallback copy still live here in TypeScript and are
+// passed into the RPC as parameters — the SQL function is just where the
+// same checks execute, not where they're decided.
 //
 // Deploy with: npx supabase functions deploy public-chat --no-verify-jwt
 // Secret:      shares ANTHROPIC_API_KEY with chat-completion (already set there)
@@ -17,9 +26,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   buildSystemPrompt,
+  estimateCostUsd,
   GENERIC_FALLBACK_MESSAGE,
-  hasActiveSubscription,
   jsonError,
+  MONTHLY_AI_BUDGET_USD,
   retrieveKnowledge,
   streamClaudeReply,
   type ChatbotRow,
@@ -47,29 +57,13 @@ const embeddingModel = new Supabase.ai.Session('gte-small')
 const VISITOR_HOURLY_LIMIT = 20
 const CHATBOT_DAILY_LIMIT = 500
 
-// deno-lint-ignore no-explicit-any
-async function findOrCreateConversation(adminClient: any, orgId: string, chatbotId: string, visitorId: string) {
-  const { data: existing } = await adminClient
-    .from('conversations')
-    .select('id')
-    .eq('chatbot_id', chatbotId)
-    .eq('visitor_id', visitorId)
-    .maybeSingle()
-
-  if (existing) {
-    // Any new visitor message means there's something an operator hasn't
-    // seen yet, regardless of whether the conversation is still AI-managed.
-    await adminClient.from('conversations').update({ unread: true }).eq('id', existing.id)
-    return existing.id as string
-  }
-
-  const { data: created, error } = await adminClient
-    .from('conversations')
-    .insert({ org_id: orgId, chatbot_id: chatbotId, visitor_id: visitorId, status: 'ai', unread: true })
-    .select('id')
-    .single()
-  if (error) throw new Error(error.message)
-  return created.id as string
+interface GateResult {
+  found: boolean
+  rate_limited?: 'visitor' | 'chatbot'
+  gated?: boolean
+  fallback_text?: string
+  conversation_id?: string
+  chatbot?: ChatbotRow
 }
 
 Deno.serve(async (req: Request) => {
@@ -89,86 +83,60 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-    const { data: chatbot, error: chatbotError } = await adminClient
-      .from('chatbots')
-      .select(
-        'id, org_id, name, company_name, business_description, industry, tone, custom_prompt, booking_url, fallback_message, status'
-      )
-      .eq('id', chatbotId)
-      .maybeSingle<ChatbotRow & { status: string }>()
-    if (chatbotError || !chatbot || chatbot.status !== 'active') {
+    const lastUserTurn = [...history].reverse().find((turn) => turn.role === 'user')
+
+    const { data: gate, error: gateError } = await adminClient.rpc('public_chat_gate', {
+      p_chatbot_id: chatbotId,
+      p_session_id: sessionId,
+      p_user_message: lastUserTurn?.content ?? null,
+      p_visitor_hourly_limit: VISITOR_HOURLY_LIMIT,
+      p_chatbot_daily_limit: CHATBOT_DAILY_LIMIT,
+      p_plan_budgets: MONTHLY_AI_BUDGET_USD,
+      p_generic_fallback: GENERIC_FALLBACK_MESSAGE,
+    })
+    if (gateError) {
+      console.error('public_chat_gate error', gateError)
+      return jsonError('Internal error', 500)
+    }
+
+    const result = gate as GateResult
+    if (!result.found) {
       return jsonError('Chatbot not found', 404)
     }
-
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-    const { count: visitorCount } = await adminClient
-      .from('widget_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('chatbot_id', chatbotId)
-      .eq('visitor_session', sessionId)
-      .gte('created_date', oneHourAgo)
-    if ((visitorCount ?? 0) >= VISITOR_HOURLY_LIMIT) {
+    if (result.rate_limited === 'visitor') {
       return jsonError("You've sent a lot of messages recently — please try again in a little while.", 429)
     }
-
-    const { count: chatbotCount } = await adminClient
-      .from('widget_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('chatbot_id', chatbotId)
-      .gte('created_date', oneDayAgo)
-    if ((chatbotCount ?? 0) >= CHATBOT_DAILY_LIMIT) {
+    if (result.rate_limited === 'chatbot') {
       return jsonError('This chatbot has reached its daily message limit — please try again tomorrow.', 429)
     }
-
-    // Record this attempt before calling Claude, so retries/failures still count toward the caps.
-    await adminClient.from('widget_messages').insert({ chatbot_id: chatbotId, visitor_session: sessionId })
-
-    const conversationId = await findOrCreateConversation(adminClient, chatbot.org_id, chatbotId, sessionId)
-
-    const lastUserTurn = [...history].reverse().find((turn) => turn.role === 'user')
-    if (lastUserTurn?.content) {
-      await adminClient.from('messages').insert({
-        org_id: chatbot.org_id,
-        conversation_id: conversationId,
-        role: 'user',
-        content: lastUserTurn.content,
-      })
-    }
-
-    // Gate on billing before touching the AI at all — no embedding call, no
-    // Claude call, no credits spent. Deliberately shows the chatbot's own
-    // configured fallback_message (same text used for "I don't know how to
-    // answer that"), never anything about billing — a site visitor must
-    // never be able to tell the business hasn't paid. Still persisted so
-    // the exchange looks normal in the dashboard, not a silent failure.
-    if (!(await hasActiveSubscription(adminClient, chatbot.org_id))) {
-      const message = chatbot.fallback_message || GENERIC_FALLBACK_MESSAGE
-      await adminClient.from('messages').insert({
-        org_id: chatbot.org_id,
-        conversation_id: conversationId,
-        role: 'assistant',
-        content: message,
-      })
-      return jsonError(message, 402)
+    if (result.gated) {
+      // No active plan or over this month's AI budget — the RPC already
+      // persisted this exact text as the assistant's reply, so the visitor
+      // sees a normal-looking answer, never anything about billing.
+      return jsonError(result.fallback_text!, 402)
     }
 
     if (!ANTHROPIC_API_KEY) {
       return jsonError('AI is not configured yet.', 503)
     }
 
+    const chatbot = result.chatbot!
+    const conversationId = result.conversation_id!
+
     const knowledgeText = await retrieveKnowledge(adminClient, embeddingModel, chatbotId, history)
     const systemPrompt = buildSystemPrompt(chatbot, knowledgeText)
 
-    return await streamClaudeReply(ANTHROPIC_API_KEY, systemPrompt, history, async (fullText) => {
-      if (!fullText.trim()) return
-      await adminClient.from('messages').insert({
-        org_id: chatbot.org_id,
-        conversation_id: conversationId,
-        role: 'assistant',
-        content: fullText,
+    return await streamClaudeReply(ANTHROPIC_API_KEY, systemPrompt, history, async (fullText, usage) => {
+      const { error } = await adminClient.rpc('public_chat_complete', {
+        p_org_id: chatbot.org_id,
+        p_chatbot_id: chatbotId,
+        p_conversation_id: conversationId,
+        p_input_tokens: usage.inputTokens,
+        p_output_tokens: usage.outputTokens,
+        p_estimated_cost_usd: estimateCostUsd(usage.inputTokens, usage.outputTokens),
+        p_reply_text: fullText,
       })
+      if (error) console.error('public_chat_complete error', error)
     })
   } catch (err) {
     console.error(err)

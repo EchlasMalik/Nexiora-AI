@@ -63,15 +63,53 @@ export function billingFallbackMessage(): string {
   return `This chatbot is currently inactive because its plan hasn't been activated yet. If you're the business owner, you can activate a plan here: ${SITE_URL}/#pricing`
 }
 
-/**
- * An org must have an active or trialing subscription for its chatbots to
- * call Claude at all — checked before any AI/embedding call in both
- * chat-completion and public-chat, so a lapsed or never-started plan never
- * consumes AI credits, not even from the dashboard's own Live Preview.
- */
-export async function hasActiveSubscription(adminClient: AdminClient, orgId: string): Promise<boolean> {
-  const { data } = await adminClient.from('subscriptions').select('status').eq('org_id', orgId).maybeSingle()
-  return data?.status === 'active' || data?.status === 'trialing'
+export type PlanKey = 'starter' | 'growth' | 'business' | 'enterprise'
+
+// Rough Claude Sonnet-class pricing, per token — verify against
+// https://www.anthropic.com/pricing before relying on this for real
+// accounting; it's meant to bound worst-case spend, not to be exact to the
+// cent. Adjust here if pricing changes or a different model is used.
+const PRICE_PER_INPUT_TOKEN_USD = 3 / 1_000_000
+const PRICE_PER_OUTPUT_TOKEN_USD = 15 / 1_000_000
+
+export function estimateCostUsd(inputTokens: number, outputTokens: number): number {
+  return inputTokens * PRICE_PER_INPUT_TOKEN_USD + outputTokens * PRICE_PER_OUTPUT_TOKEN_USD
+}
+
+// Monthly AI spend ceiling per plan, in USD (Anthropic bills in USD
+// regardless of what currency the plan itself is priced in). Sized to keep
+// worst-case gross margin reasonable against each plan's GBP price even if a
+// customer maxes out their budget every month — not just "well above typical
+// usage" like the original pass, which left Business too thin (~11% margin
+// at ~£199/$253) once Stripe fees and infra costs are factored in.
+export const MONTHLY_AI_BUDGET_USD: Record<PlanKey, number> = {
+  starter: 15,
+  growth: 50,
+  business: 150,
+  enterprise: 750,
+}
+
+/** Owner-facing only, same reasoning as billingFallbackMessage — never shown to a site visitor. */
+export function spendCapMessage(plan: PlanKey, spentUsd: number): string {
+  const budget = MONTHLY_AI_BUDGET_USD[plan]
+  return `This chatbot has used its AI budget for the ${plan} plan this month ($${spentUsd.toFixed(2)} / $${budget.toFixed(2)}). It'll reset next month, or you can upgrade your plan for a higher budget.`
+}
+
+/** Logs real token usage from a completed Claude call for spend-cap accounting. */
+export async function logAiUsage(
+  adminClient: AdminClient,
+  orgId: string,
+  chatbotId: string,
+  inputTokens: number,
+  outputTokens: number
+): Promise<void> {
+  await adminClient.from('ai_usage_log').insert({
+    org_id: orgId,
+    chatbot_id: chatbotId,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    estimated_cost_usd: estimateCostUsd(inputTokens, outputTokens),
+  })
 }
 
 export function buildSystemPrompt(chatbot: ChatbotRow, knowledgeText: string): string {
@@ -129,18 +167,23 @@ export async function retrieveKnowledge(
     .join('\n\n---\n\n')
 }
 
+export interface ClaudeUsage {
+  inputTokens: number
+  outputTokens: number
+}
+
 /**
  * Calls Claude with streaming enabled and relays it as simple `data: {text}`
  * SSE events. `onComplete` (if given) fires once with whatever text was
- * accumulated — on a clean finish or a mid-stream error alike — so a caller
- * can persist the reply even if the connection drops partway through rather
- * than losing it entirely.
+ * accumulated and the real token usage Anthropic reported — on a clean
+ * finish or a mid-stream error alike — so a caller can persist the reply
+ * (even a partial one) and log accurate spend rather than losing either.
  */
 export async function streamClaudeReply(
   anthropicApiKey: string,
   systemPrompt: string,
   history: HistoryTurn[],
-  onComplete?: (fullText: string) => void | Promise<void>
+  onComplete?: (fullText: string, usage: ClaudeUsage) => void | Promise<void>
 ): Promise<Response> {
   const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -174,6 +217,8 @@ export async function streamClaudeReply(
       const encoder = new TextEncoder()
       let buffer = ''
       let fullText = ''
+      let inputTokens = 0
+      let outputTokens = 0
 
       try {
         while (true) {
@@ -192,6 +237,14 @@ export async function streamClaudeReply(
               if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                 fullText += parsed.delta.text
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`))
+              } else if (parsed.type === 'message_start' && parsed.message?.usage) {
+                // Real input token count for this call — includes the full
+                // system prompt + RAG context + history, reported once up front.
+                inputTokens = parsed.message.usage.input_tokens ?? 0
+              } else if (parsed.type === 'message_delta' && parsed.usage) {
+                // Cumulative output tokens so far; the last one before
+                // message_stop is the final total for the reply.
+                outputTokens = parsed.usage.output_tokens ?? outputTokens
               }
             } catch {
               // Ignore malformed/partial SSE chunks — the next read fills them in.
@@ -205,7 +258,7 @@ export async function streamClaudeReply(
       } finally {
         controller.close()
         try {
-          await onComplete?.(fullText)
+          await onComplete?.(fullText, { inputTokens, outputTokens })
         } catch (err) {
           console.error('streamClaudeReply onComplete failed', err)
         }

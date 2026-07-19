@@ -44,6 +44,22 @@ export async function fetchUsageStats(orgId: string): Promise<UsageStats> {
   }
 }
 
+// Mirrors MONTHLY_AI_BUDGET_USD in supabase/functions/_shared/chat-core.ts —
+// keep the two in sync if the budget or plan set ever changes.
+export const MONTHLY_AI_BUDGET_USD: Record<Subscription['plan'], number> = {
+  starter: 15,
+  growth: 50,
+  business: 150,
+  enterprise: 750,
+}
+
+/** Real AI spend this calendar month, from actual token usage Anthropic reported — not an estimate of message count. */
+export async function fetchAiSpend(orgId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('get_monthly_ai_spend', { check_org_id: orgId })
+  if (error) throw new Error(error.message)
+  return Number(data ?? 0)
+}
+
 async function callBillingFunction(path: string, body: Record<string, unknown>): Promise<{ url: string }> {
   const {
     data: { session },

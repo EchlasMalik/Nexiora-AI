@@ -6,6 +6,11 @@
 // The public embeddable widget uses the separate public-chat function
 // instead, which has its own rate limiting since it's reachable anonymously.
 //
+// The chatbot lookup, membership check, billing gate, and spend-cap check
+// run as one round trip via the `chat_completion_gate` RPC instead of four
+// separate queries — same checks as before, same decision logic (which
+// still lives here, passed into the RPC as parameters), just fewer trips.
+//
 // Deploy with: npx supabase functions deploy chat-completion
 // Secret:      npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 
@@ -13,12 +18,15 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   billingFallbackMessage,
   buildSystemPrompt,
-  hasActiveSubscription,
   jsonError,
+  logAiUsage,
+  MONTHLY_AI_BUDGET_USD,
   retrieveKnowledge,
+  spendCapMessage,
   streamClaudeReply,
   type ChatbotRow,
   type HistoryTurn,
+  type PlanKey,
 } from '../_shared/chat-core.ts'
 
 declare const Supabase: {
@@ -32,6 +40,15 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // Same embedding model used by embed-document — queries and stored chunks
 // must come from the same model to compare meaningfully.
 const embeddingModel = new Supabase.ai.Session('gte-small')
+
+interface GateResult {
+  found: boolean
+  authorized?: boolean
+  active_plan?: PlanKey | null
+  spent_usd?: number
+  budget_usd?: number
+  chatbot?: ChatbotRow
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -62,42 +79,41 @@ Deno.serve(async (req: Request) => {
       return jsonError('chatbotId and history are required', 400)
     }
 
-    const { data: chatbot, error: chatbotError } = await adminClient
-      .from('chatbots')
-      .select('id, org_id, name, company_name, business_description, industry, tone, custom_prompt, booking_url, fallback_message')
-      .eq('id', chatbotId)
-      .maybeSingle<ChatbotRow>()
-    if (chatbotError || !chatbot) {
+    const { data: gate, error: gateError } = await adminClient.rpc('chat_completion_gate', {
+      p_chatbot_id: chatbotId,
+      p_user_id: user.id,
+      p_plan_budgets: MONTHLY_AI_BUDGET_USD,
+    })
+    if (gateError) {
+      console.error('chat_completion_gate error', gateError)
+      return jsonError('Internal error', 500)
+    }
+
+    const result = gate as GateResult
+    if (!result.found) {
       return jsonError('Chatbot not found', 404)
     }
-
-    // Authorization: the caller must be a member of the org that owns this
-    // chatbot. We fetched via the service role (bypassing RLS) above for a
-    // single efficient lookup, so this check is not optional.
-    const { data: membership } = await adminClient
-      .from('memberships')
-      .select('id')
-      .eq('org_id', chatbot.org_id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (!membership) {
+    if (!result.authorized) {
       return jsonError('Not authorized for this chatbot', 403)
     }
-
-    // Same gate as public-chat — an org without an active plan doesn't get
-    // free AI usage through the dashboard's own Live Preview either.
-    if (!(await hasActiveSubscription(adminClient, chatbot.org_id))) {
+    if (!result.active_plan) {
       return jsonError(billingFallbackMessage(), 402)
+    }
+    if (result.spent_usd! >= result.budget_usd!) {
+      return jsonError(spendCapMessage(result.active_plan, result.spent_usd!), 402)
     }
 
     if (!ANTHROPIC_API_KEY) {
       return jsonError('AI is not configured yet — add ANTHROPIC_API_KEY as an Edge Function secret.', 503)
     }
 
+    const chatbot = result.chatbot!
     const knowledgeText = await retrieveKnowledge(adminClient, embeddingModel, chatbotId, history)
     const systemPrompt = buildSystemPrompt(chatbot, knowledgeText)
 
-    return await streamClaudeReply(ANTHROPIC_API_KEY, systemPrompt, history)
+    return await streamClaudeReply(ANTHROPIC_API_KEY, systemPrompt, history, async (_fullText, usage) => {
+      await logAiUsage(adminClient, chatbot.org_id, chatbotId, usage.inputTokens, usage.outputTokens)
+    })
   } catch (err) {
     console.error(err)
     return jsonError('Internal error', 500)

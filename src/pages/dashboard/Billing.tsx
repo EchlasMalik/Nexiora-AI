@@ -5,7 +5,15 @@ import { toast } from 'sonner'
 import { Check, CreditCard } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
 import { ChatbotRepo } from '@/entities'
-import { fetchSubscription, fetchUsageStats, startCheckout, openBillingPortal, type Subscription } from '@/lib/billing'
+import {
+  fetchSubscription,
+  fetchUsageStats,
+  fetchAiSpend,
+  MONTHLY_AI_BUDGET_USD,
+  startCheckout,
+  openBillingPortal,
+  type Subscription,
+} from '@/lib/billing'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -17,6 +25,8 @@ interface UsageStat {
   used: number
   limit: number
   unit?: string
+  prefix?: string
+  decimals?: number
 }
 
 const plans: {
@@ -78,6 +88,10 @@ const plans: {
   },
 ]
 
+function formatStatNumber(value: number, decimals?: number): string {
+  return decimals != null ? value.toFixed(decimals) : value.toLocaleString()
+}
+
 function UsageCard({ stat }: { stat: UsageStat }) {
   const pct = stat.limit > 0 ? Math.min(100, Math.round((stat.used / stat.limit) * 100)) : 0
 
@@ -87,8 +101,10 @@ function UsageCard({ stat }: { stat: UsageStat }) {
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-brand-navy">{stat.label}</p>
           <p className="text-sm text-brand-text-secondary">
-            {stat.used.toLocaleString()}
-            {stat.unit ?? ''} / {stat.limit.toLocaleString()}
+            {stat.prefix ?? ''}
+            {formatStatNumber(stat.used, stat.decimals)}
+            {stat.unit ?? ''} / {stat.prefix ?? ''}
+            {formatStatNumber(stat.limit, stat.decimals)}
             {stat.unit ?? ''}
           </p>
         </div>
@@ -152,8 +168,21 @@ export default function Billing() {
     enabled: !!orgId,
   })
 
+  const { data: aiSpend } = useQuery({
+    queryKey: ['aiSpend', orgId],
+    queryFn: () => fetchAiSpend(orgId!),
+    enabled: !!orgId,
+  })
+
   const usageStats: UsageStat[] = [
     { label: 'Messages this month', used: usage?.messagesThisMonth ?? 0, limit: currentPlanDetails.messageLimit },
+    {
+      label: 'AI usage this month',
+      used: aiSpend ?? 0,
+      limit: MONTHLY_AI_BUDGET_USD[currentPlanDetails.key],
+      prefix: '$',
+      decimals: 2,
+    },
     { label: 'Knowledge base', used: usage?.knowledgeBaseMB ?? 0, limit: 50, unit: ' MB' },
     { label: 'Active chatbots', used: activeChatbots, limit: currentPlanDetails.chatbotLimit },
   ]
@@ -187,7 +216,7 @@ export default function Billing() {
     <DashboardLayout>
       <PageHeader title="Billing" description="Manage your plan, usage, and payment details." />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {usageStats.map((stat) => (
           <UsageCard key={stat.label} stat={stat} />
         ))}
