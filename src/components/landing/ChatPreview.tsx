@@ -12,7 +12,7 @@ const MESSAGES: ChatMessage[] = [
   { role: 'assistant', text: "Hi \u{1F44B} I'm Aria from Nexiora AI. What brings you here today?" },
   { role: 'user', text: "Hey! I need a chatbot for my agency's website." },
   { role: 'assistant', text: 'I can help with that — mind sharing your email so I can send a quick demo?' },
-  { role: 'user', text: "Sure, it's echlas@nexioratalent.com" },
+  { role: 'user', text: "Sure, it's Echlas@NexioraTalent.com" },
   { role: 'assistant', text: "Perfect — I've booked you a 15-min walkthrough for tomorrow at 2:00 PM." },
 ]
 
