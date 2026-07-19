@@ -57,7 +57,7 @@ export function FeaturesGrid() {
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: (i % 3) * 0.1 }}
             >
-              <Card className="h-full transition-all hover:border-violet-200 hover:shadow-md">
+              <Card className="h-full">
                 <CardHeader>
                   <div className="flex size-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
                     <feature.icon className="size-5" />

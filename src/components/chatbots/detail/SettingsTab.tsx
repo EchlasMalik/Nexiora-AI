@@ -311,7 +311,7 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
         </CardContent>
       </Card>
 
-      <Card className="border-destructive/30">
+      <Card className="border-destructive/30 hover:border-destructive/50">
         <CardHeader>
           <CardTitle className="text-destructive">Danger zone</CardTitle>
           <CardDescription>

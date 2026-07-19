@@ -266,7 +266,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="border-red-200">
+          <Card className="border-red-200 hover:border-red-300">
             <CardHeader>
               <CardTitle className="text-destructive">Danger zone</CardTitle>
               <CardDescription>
