@@ -74,6 +74,10 @@ export const streamChatbotReply: GetReplyFn = async ({ chatbot, history, onDelta
       signal,
     })
 
+    if (response.status === 402) {
+      const body = await response.json().catch(() => ({}) as { error?: string })
+      return body.error || fallback
+    }
     if (!response.ok) return fallback
     const fullText = await consumeSSEStream(response, onDelta)
     return fullText || fallback

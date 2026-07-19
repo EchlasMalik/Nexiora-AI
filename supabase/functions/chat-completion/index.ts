@@ -10,7 +10,16 @@
 // Secret:      npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { buildSystemPrompt, jsonError, retrieveKnowledge, streamClaudeReply, type ChatbotRow, type HistoryTurn } from '../_shared/chat-core.ts'
+import {
+  billingFallbackMessage,
+  buildSystemPrompt,
+  hasActiveSubscription,
+  jsonError,
+  retrieveKnowledge,
+  streamClaudeReply,
+  type ChatbotRow,
+  type HistoryTurn,
+} from '../_shared/chat-core.ts'
 
 declare const Supabase: {
   ai: { Session: new (model: string) => { run: (text: string, opts?: Record<string, unknown>) => Promise<unknown> } }
@@ -73,6 +82,12 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
     if (!membership) {
       return jsonError('Not authorized for this chatbot', 403)
+    }
+
+    // Same gate as public-chat — an org without an active plan doesn't get
+    // free AI usage through the dashboard's own Live Preview either.
+    if (!(await hasActiveSubscription(adminClient, chatbot.org_id))) {
+      return jsonError(billingFallbackMessage(), 402)
     }
 
     if (!ANTHROPIC_API_KEY) {

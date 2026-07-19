@@ -1,6 +1,7 @@
 import { Bot, Headset, User } from 'lucide-react'
 import type { Message } from '@/entities'
 import { cn } from '@/lib/utils'
+import { LinkifiedText } from '@/components/LinkifiedText'
 
 export function MessageBubble({ message }: { message: Message }) {
   if (message.role === 'user') {
@@ -10,7 +11,7 @@ export function MessageBubble({ message }: { message: Message }) {
           <User className="size-4" />
         </div>
         <div className="max-w-[70%] rounded-2xl rounded-tl-md bg-muted px-4 py-2.5 text-sm text-brand-navy">
-          {message.content}
+          <LinkifiedText text={message.content} />
         </div>
       </div>
     )
@@ -26,7 +27,7 @@ export function MessageBubble({ message }: { message: Message }) {
           isOperator ? 'bg-amber-500' : 'bg-linear-to-r from-violet-600 to-violet-800'
         )}
       >
-        {message.content}
+        <LinkifiedText text={message.content} />
       </div>
       <div
         className={cn(

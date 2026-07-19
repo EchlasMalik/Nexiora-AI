@@ -17,6 +17,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   buildSystemPrompt,
+  GENERIC_FALLBACK_MESSAGE,
+  hasActiveSubscription,
   jsonError,
   retrieveKnowledge,
   streamClaudeReply,
@@ -133,6 +135,23 @@ Deno.serve(async (req: Request) => {
         role: 'user',
         content: lastUserTurn.content,
       })
+    }
+
+    // Gate on billing before touching the AI at all — no embedding call, no
+    // Claude call, no credits spent. Deliberately shows the chatbot's own
+    // configured fallback_message (same text used for "I don't know how to
+    // answer that"), never anything about billing — a site visitor must
+    // never be able to tell the business hasn't paid. Still persisted so
+    // the exchange looks normal in the dashboard, not a silent failure.
+    if (!(await hasActiveSubscription(adminClient, chatbot.org_id))) {
+      const message = chatbot.fallback_message || GENERIC_FALLBACK_MESSAGE
+      await adminClient.from('messages').insert({
+        org_id: chatbot.org_id,
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: message,
+      })
+      return jsonError(message, 402)
     }
 
     if (!ANTHROPIC_API_KEY) {

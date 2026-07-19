@@ -38,6 +38,10 @@ export const streamPublicChatbotReply: GetReplyFn = async ({ chatbot, history, o
       const body = await response.json().catch(() => ({}) as { error?: string })
       return body.error || "You've sent a lot of messages recently — please try again in a little while."
     }
+    if (response.status === 402) {
+      const body = await response.json().catch(() => ({}) as { error?: string })
+      return body.error || fallback
+    }
     if (!response.ok) return fallback
 
     const fullText = await consumeSSEStream(response, onDelta)

@@ -4,6 +4,7 @@ import { MessageCircle, Send, Sparkles, X } from 'lucide-react'
 import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot } from '@/lib/ai'
 import type { SuggestedQuestion } from '@/entities'
 import { cn } from '@/lib/utils'
+import { LinkifiedText } from '@/components/LinkifiedText'
 
 interface ChatWidgetMessage extends ChatTurn {
   id: string
@@ -51,6 +52,7 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
   const [streamingText, setStreamingText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const themeColor = chatbot.theme_color || '#7C3AED'
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
   useEffect(() => {
     return () => {
       abortRef.current?.abort()
+      if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
     }
   }, [])
 
@@ -115,13 +118,20 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
       sendMessage(qa.question)
       return
     }
-    // A fixed answer is set — show it instantly rather than round-tripping
-    // through the AI, same as if the business had scripted this reply.
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: 'user', content: qa.question },
-      { id: crypto.randomUUID(), role: 'assistant', content: qa.answer },
-    ])
+
+    // A fixed answer is set, so there's no real AI call to wait on — but
+    // popping it in instantly reads as robotic. A short "typing" beat
+    // (reusing the same indicator as a real streamed reply) makes it feel
+    // like a natural response instead of a canned one.
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'user', content: qa.question }])
+    setIsResponding(true)
+
+    const thinkingDelay = 3000 + Math.random() * 2000
+    thinkingTimeoutRef.current = setTimeout(() => {
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: qa.answer }])
+      setIsResponding(false)
+      thinkingTimeoutRef.current = null
+    }, thinkingDelay)
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -196,7 +206,7 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
               )}
               style={message.role === 'user' ? { backgroundColor: themeColor } : undefined}
             >
-              {message.content}
+              <LinkifiedText text={message.content} />
             </motion.div>
           ))}
 
@@ -226,7 +236,7 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
               animate={{ opacity: 1, y: 0 }}
               className="max-w-[80%] rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-sm text-brand-navy shadow-sm"
             >
-              {streamingText}
+              <LinkifiedText text={streamingText} />
             </motion.div>
           )}
         </AnimatePresence>

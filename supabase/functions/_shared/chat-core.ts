@@ -45,6 +45,35 @@ export function jsonError(message: string, status: number): Response {
   })
 }
 
+// Public marketing site URL, used only to build the "go activate a plan"
+// link below — override with a Supabase secret once a custom domain is set.
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://nexiora-ai-agent.vercel.app'
+
+export const GENERIC_FALLBACK_MESSAGE =
+  "Sorry, I'm having trouble responding right now. Please try again in a moment."
+
+/**
+ * Owner-facing only — names the actual billing problem and links to fix it.
+ * Used by chat-completion (the dashboard's own Live Preview, authenticated,
+ * only ever seen by someone on the org). Never used by public-chat: a real
+ * site visitor must never learn that the business hasn't paid, so that path
+ * shows the chatbot's own configured fallback_message instead.
+ */
+export function billingFallbackMessage(): string {
+  return `This chatbot is currently inactive because its plan hasn't been activated yet. If you're the business owner, you can activate a plan here: ${SITE_URL}/#pricing`
+}
+
+/**
+ * An org must have an active or trialing subscription for its chatbots to
+ * call Claude at all — checked before any AI/embedding call in both
+ * chat-completion and public-chat, so a lapsed or never-started plan never
+ * consumes AI credits, not even from the dashboard's own Live Preview.
+ */
+export async function hasActiveSubscription(adminClient: AdminClient, orgId: string): Promise<boolean> {
+  const { data } = await adminClient.from('subscriptions').select('status').eq('org_id', orgId).maybeSingle()
+  return data?.status === 'active' || data?.status === 'trialing'
+}
+
 export function buildSystemPrompt(chatbot: ChatbotRow, knowledgeText: string): string {
   const toneDescription = TONE_GUIDANCE[chatbot.tone] ?? TONE_GUIDANCE.professional
   const parts = [
