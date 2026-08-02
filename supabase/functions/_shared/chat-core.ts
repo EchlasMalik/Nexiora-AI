@@ -95,20 +95,25 @@ export function spendCapMessage(plan: PlanKey, spentUsd: number): string {
   return `This chatbot has used its AI budget for the ${plan} plan this month ($${spentUsd.toFixed(2)} / $${budget.toFixed(2)}). It'll reset next month, or you can upgrade your plan for a higher budget.`
 }
 
-/** Logs real token usage from a completed Claude call for spend-cap accounting. */
+/**
+ * Logs real token usage from a completed AI call for spend-cap accounting.
+ * Gemini is only ever used as a free-tier fallback, so it's logged at $0
+ * regardless of token count — only Anthropic usage counts against budget.
+ */
 export async function logAiUsage(
   adminClient: AdminClient,
   orgId: string,
   chatbotId: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  provider: AiProvider = 'anthropic'
 ): Promise<void> {
   await adminClient.from('ai_usage_log').insert({
     org_id: orgId,
     chatbot_id: chatbotId,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
-    estimated_cost_usd: estimateCostUsd(inputTokens, outputTokens),
+    estimated_cost_usd: provider === 'gemini' ? 0 : estimateCostUsd(inputTokens, outputTokens),
   })
 }
 
@@ -167,89 +172,119 @@ export async function retrieveKnowledge(
     .join('\n\n---\n\n')
 }
 
-export interface ClaudeUsage {
+export type AiProvider = 'anthropic' | 'gemini'
+
+export interface AiUsage {
   inputTokens: number
   outputTokens: number
+  provider: AiProvider
 }
 
-/**
- * Calls Claude with streaming enabled and relays it as simple `data: {text}`
- * SSE events. `onComplete` (if given) fires once with whatever text was
- * accumulated and the real token usage Anthropic reported — on a clean
- * finish or a mid-stream error alike — so a caller can persist the reply
- * (even a partial one) and log accurate spend rather than losing either.
- */
-export async function streamClaudeReply(
-  anthropicApiKey: string,
-  systemPrompt: string,
-  history: HistoryTurn[],
-  onComplete?: (fullText: string, usage: ClaudeUsage) => void | Promise<void>
-): Promise<Response> {
-  const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': anthropicApiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: history.map((turn) => ({
-        role: turn.role === 'assistant' ? 'assistant' : 'user',
-        content: turn.content,
-      })),
-      stream: true,
-    }),
-  })
+// Free-tier Gemini model used only as a fallback when Anthropic is
+// unreachable or out of credits — swap if Google renames/retires this model.
+const GEMINI_MODEL = 'gemini-2.5-flash'
 
-  if (!anthropicResponse.ok || !anthropicResponse.body) {
-    const errText = await anthropicResponse.text().catch(() => '')
-    console.error('Anthropic error', anthropicResponse.status, errText)
-    return jsonError('AI provider error', 502)
+interface StreamEvent {
+  text?: string
+  inputTokens?: number
+  outputTokens?: number
+}
+
+/** Parses Claude's SSE stream into plain text/usage events. */
+async function* parseAnthropicStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const events = buffer.split('\n\n')
+    buffer = events.pop() ?? ''
+
+    for (const evt of events) {
+      const dataLine = evt.split('\n').find((line) => line.startsWith('data: '))
+      if (!dataLine) continue
+      const payload = dataLine.slice(6)
+      try {
+        const parsed = JSON.parse(payload)
+        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+          yield { text: parsed.delta.text }
+        } else if (parsed.type === 'message_start' && parsed.message?.usage) {
+          // Real input token count for this call — includes the full
+          // system prompt + RAG context + history, reported once up front.
+          yield { inputTokens: parsed.message.usage.input_tokens ?? 0 }
+        } else if (parsed.type === 'message_delta' && parsed.usage) {
+          // Cumulative output tokens so far; the last one before
+          // message_stop is the final total for the reply.
+          yield { outputTokens: parsed.usage.output_tokens ?? 0 }
+        }
+      } catch {
+        // Ignore malformed/partial SSE chunks — the next read fills them in.
+      }
+    }
   }
+}
 
+/** Parses Gemini's SSE stream (alt=sse) into the same plain text/usage events. */
+async function* parseGeminiStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const events = buffer.split('\n\n')
+    buffer = events.pop() ?? ''
+
+    for (const evt of events) {
+      const dataLine = evt.split('\n').find((line) => line.startsWith('data: '))
+      if (!dataLine) continue
+      const payload = dataLine.slice(6)
+      try {
+        const parsed = JSON.parse(payload)
+        const text = (parsed.candidates?.[0]?.content?.parts ?? [])
+          .map((part: { text?: string }) => part.text ?? '')
+          .join('')
+        if (text) yield { text }
+        // Gemini reports cumulative usage on each chunk; the last one wins.
+        if (parsed.usageMetadata) {
+          yield {
+            inputTokens: parsed.usageMetadata.promptTokenCount ?? 0,
+            outputTokens: parsed.usageMetadata.candidatesTokenCount ?? 0,
+          }
+        }
+      } catch {
+        // Ignore malformed/partial SSE chunks — the next read fills them in.
+      }
+    }
+  }
+}
+
+/** Relays a provider-agnostic event stream as `data: {text}` SSE, same shape either provider produces. */
+function relayAsSse(
+  source: AsyncGenerator<StreamEvent>,
+  provider: AiProvider,
+  onComplete?: (fullText: string, usage: AiUsage) => void | Promise<void>
+): Response {
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = anthropicResponse.body!.getReader()
-      const decoder = new TextDecoder()
       const encoder = new TextEncoder()
-      let buffer = ''
       let fullText = ''
       let inputTokens = 0
       let outputTokens = 0
 
       try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const events = buffer.split('\n\n')
-          buffer = events.pop() ?? ''
-
-          for (const evt of events) {
-            const dataLine = evt.split('\n').find((line) => line.startsWith('data: '))
-            if (!dataLine) continue
-            const payload = dataLine.slice(6)
-            try {
-              const parsed = JSON.parse(payload)
-              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                fullText += parsed.delta.text
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`))
-              } else if (parsed.type === 'message_start' && parsed.message?.usage) {
-                // Real input token count for this call — includes the full
-                // system prompt + RAG context + history, reported once up front.
-                inputTokens = parsed.message.usage.input_tokens ?? 0
-              } else if (parsed.type === 'message_delta' && parsed.usage) {
-                // Cumulative output tokens so far; the last one before
-                // message_stop is the final total for the reply.
-                outputTokens = parsed.usage.output_tokens ?? outputTokens
-              }
-            } catch {
-              // Ignore malformed/partial SSE chunks — the next read fills them in.
-            }
+        for await (const evt of source) {
+          if (evt.text) {
+            fullText += evt.text
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: evt.text })}\n\n`))
           }
+          if (evt.inputTokens !== undefined) inputTokens = evt.inputTokens
+          if (evt.outputTokens !== undefined) outputTokens = evt.outputTokens
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
       } catch (err) {
@@ -258,9 +293,9 @@ export async function streamClaudeReply(
       } finally {
         controller.close()
         try {
-          await onComplete?.(fullText, { inputTokens, outputTokens })
+          await onComplete?.(fullText, { inputTokens, outputTokens, provider })
         } catch (err) {
-          console.error('streamClaudeReply onComplete failed', err)
+          console.error('relayAsSse onComplete failed', err)
         }
       }
     },
@@ -274,4 +309,95 @@ export async function streamClaudeReply(
       Connection: 'keep-alive',
     },
   })
+}
+
+/**
+ * Calls Claude first; if it's unreachable, out of credits, or otherwise
+ * errors on the initial request (bad key, rate limit, overload, etc.),
+ * falls back to Gemini's free-tier flash model instead. Either provider's
+ * reply is relayed identically as `data: {text}` SSE events, so callers and
+ * the frontend never need to know which one actually answered.
+ *
+ * `onComplete` (if given) fires once with whatever text was accumulated,
+ * the real token usage the winning provider reported, and which provider
+ * it was — on a clean finish or a mid-stream error alike — so a caller can
+ * persist the reply (even a partial one) and log accurate spend.
+ */
+export async function streamAiReply(
+  anthropicApiKey: string | undefined,
+  geminiApiKey: string | undefined,
+  systemPrompt: string,
+  history: HistoryTurn[],
+  onComplete?: (fullText: string, usage: AiUsage) => void | Promise<void>
+): Promise<Response> {
+  if (anthropicApiKey) {
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: history.map((turn) => ({
+          role: turn.role === 'assistant' ? 'assistant' : 'user',
+          content: turn.content,
+        })),
+        stream: true,
+      }),
+    }).catch((err) => {
+      console.error('Anthropic request failed, falling back to Gemini', err)
+      return null
+    })
+
+    if (anthropicResponse?.ok && anthropicResponse.body) {
+      return relayAsSse(parseAnthropicStream(anthropicResponse.body), 'anthropic', onComplete)
+    }
+
+    if (anthropicResponse) {
+      const errText = await anthropicResponse.text().catch(() => '')
+      console.error(
+        'Anthropic error, falling back to Gemini:',
+        anthropicResponse.status,
+        errText
+      )
+    }
+  }
+
+  if (!geminiApiKey) {
+    return jsonError('AI provider error', 502)
+  }
+
+  const geminiResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': geminiApiKey,
+      },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: history.map((turn) => ({
+          role: turn.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: turn.content }],
+        })),
+        generationConfig: { maxOutputTokens: 1024 },
+      }),
+    }
+  ).catch((err) => {
+    console.error('Gemini request failed', err)
+    return null
+  })
+
+  if (!geminiResponse?.ok || !geminiResponse.body) {
+    const errText = await geminiResponse?.text().catch(() => '')
+    console.error('Gemini error', geminiResponse?.status, errText)
+    return jsonError('AI provider error', 502)
+  }
+
+  return relayAsSse(parseGeminiStream(geminiResponse.body), 'gemini', onComplete)
 }
