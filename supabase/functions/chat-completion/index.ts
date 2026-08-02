@@ -12,8 +12,8 @@
 // still lives here, passed into the RPC as parameters), just fewer trips.
 //
 // Deploy with: npx supabase functions deploy chat-completion
-// Secrets:     npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-... GEMINI_API_KEY=...
-//              (Gemini is an optional free-tier fallback used only when the
+// Secrets:     npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-... GROQ_API_KEY=...
+//              (Groq is an optional free-tier fallback used only when the
 //              Anthropic call fails — e.g. no credits — see streamAiReply)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -36,7 +36,7 @@ declare const Supabase: {
 }
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
@@ -106,9 +106,9 @@ Deno.serve(async (req: Request) => {
       return jsonError(spendCapMessage(result.active_plan, result.spent_usd!), 402)
     }
 
-    if (!ANTHROPIC_API_KEY && !GEMINI_API_KEY) {
+    if (!ANTHROPIC_API_KEY && !GROQ_API_KEY) {
       return jsonError(
-        'AI is not configured yet — add ANTHROPIC_API_KEY (and optionally GEMINI_API_KEY as a fallback) as an Edge Function secret.',
+        'AI is not configured yet — add ANTHROPIC_API_KEY (and optionally GROQ_API_KEY as a fallback) as an Edge Function secret.',
         503
       )
     }
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
     const knowledgeText = await retrieveKnowledge(adminClient, embeddingModel, chatbotId, history)
     const systemPrompt = buildSystemPrompt(chatbot, knowledgeText)
 
-    return await streamAiReply(ANTHROPIC_API_KEY, GEMINI_API_KEY, systemPrompt, history, async (_fullText, usage) => {
+    return await streamAiReply(ANTHROPIC_API_KEY, GROQ_API_KEY, systemPrompt, history, async (_fullText, usage) => {
       await logAiUsage(adminClient, chatbot.org_id, chatbotId, usage.inputTokens, usage.outputTokens, usage.provider)
     })
   } catch (err) {

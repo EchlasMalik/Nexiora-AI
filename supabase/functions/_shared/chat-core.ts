@@ -97,7 +97,7 @@ export function spendCapMessage(plan: PlanKey, spentUsd: number): string {
 
 /**
  * Logs real token usage from a completed AI call for spend-cap accounting.
- * Gemini is only ever used as a free-tier fallback, so it's logged at $0
+ * Groq is only ever used as a free-tier fallback, so it's logged at $0
  * regardless of token count — only Anthropic usage counts against budget.
  */
 export async function logAiUsage(
@@ -113,7 +113,7 @@ export async function logAiUsage(
     chatbot_id: chatbotId,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
-    estimated_cost_usd: provider === 'gemini' ? 0 : estimateCostUsd(inputTokens, outputTokens),
+    estimated_cost_usd: provider === 'groq' ? 0 : estimateCostUsd(inputTokens, outputTokens),
   })
 }
 
@@ -172,7 +172,7 @@ export async function retrieveKnowledge(
     .join('\n\n---\n\n')
 }
 
-export type AiProvider = 'anthropic' | 'gemini'
+export type AiProvider = 'anthropic' | 'groq'
 
 export interface AiUsage {
   inputTokens: number
@@ -180,9 +180,13 @@ export interface AiUsage {
   provider: AiProvider
 }
 
-// Free-tier Gemini model used only as a fallback when Anthropic is
-// unreachable or out of credits — swap if Google renames/retires this model.
-const GEMINI_MODEL = 'gemini-2.5-flash'
+// Free-tier Groq model used only as a fallback when Anthropic is unreachable
+// or out of credits. Switched from Gemini after testing showed free-tier
+// Gemini calls made from Supabase's own cloud IP range (AWS eu-west-2) just
+// hang for ~30s and never return anything, not even an error — suspected
+// anti-abuse blocking of datacenter traffic on Google's end. Groq's free
+// tier + LPU hardware answers very fast.
+const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 interface StreamEvent {
   text?: string
@@ -227,8 +231,8 @@ async function* parseAnthropicStream(body: ReadableStream<Uint8Array>): AsyncGen
   }
 }
 
-/** Parses Gemini's SSE stream (alt=sse) into the same plain text/usage events. */
-async function* parseGeminiStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
+/** Parses Groq's OpenAI-compatible SSE stream into the same plain text/usage events. */
+async function* parseGroqStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -244,17 +248,17 @@ async function* parseGeminiStream(body: ReadableStream<Uint8Array>): AsyncGenera
       const dataLine = evt.split('\n').find((line) => line.startsWith('data: '))
       if (!dataLine) continue
       const payload = dataLine.slice(6)
+      if (payload === '[DONE]') continue
       try {
         const parsed = JSON.parse(payload)
-        const text = (parsed.candidates?.[0]?.content?.parts ?? [])
-          .map((part: { text?: string }) => part.text ?? '')
-          .join('')
+        const text = parsed.choices?.[0]?.delta?.content
         if (text) yield { text }
-        // Gemini reports cumulative usage on each chunk; the last one wins.
-        if (parsed.usageMetadata) {
+        // Only present on the final chunk (stream_options.include_usage).
+        const usage = parsed.x_groq?.usage ?? parsed.usage
+        if (usage) {
           yield {
-            inputTokens: parsed.usageMetadata.promptTokenCount ?? 0,
-            outputTokens: parsed.usageMetadata.candidatesTokenCount ?? 0,
+            inputTokens: usage.prompt_tokens ?? 0,
+            outputTokens: usage.completion_tokens ?? 0,
           }
         }
       } catch {
@@ -314,7 +318,7 @@ function relayAsSse(
 /**
  * Calls Claude first; if it's unreachable, out of credits, or otherwise
  * errors on the initial request (bad key, rate limit, overload, etc.),
- * falls back to Gemini's free-tier flash model instead. Either provider's
+ * falls back to Groq's free-tier Llama model instead. Either provider's
  * reply is relayed identically as `data: {text}` SSE events, so callers and
  * the frontend never need to know which one actually answered.
  *
@@ -325,7 +329,7 @@ function relayAsSse(
  */
 export async function streamAiReply(
   anthropicApiKey: string | undefined,
-  geminiApiKey: string | undefined,
+  groqApiKey: string | undefined,
   systemPrompt: string,
   history: HistoryTurn[],
   onComplete?: (fullText: string, usage: AiUsage) => void | Promise<void>
@@ -349,7 +353,7 @@ export async function streamAiReply(
         stream: true,
       }),
     }).catch((err) => {
-      console.error('Anthropic request failed, falling back to Gemini', err)
+      console.error('Anthropic request failed, falling back to Groq', err)
       return null
     })
 
@@ -359,45 +363,43 @@ export async function streamAiReply(
 
     if (anthropicResponse) {
       const errText = await anthropicResponse.text().catch(() => '')
-      console.error(
-        'Anthropic error, falling back to Gemini:',
-        anthropicResponse.status,
-        errText
-      )
+      console.error('Anthropic error, falling back to Groq:', anthropicResponse.status, errText)
     }
   }
 
-  if (!geminiApiKey) {
+  if (!groqApiKey) {
     return jsonError('AI provider error', 502)
   }
 
-  const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': geminiApiKey,
-      },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: history.map((turn) => ({
-          role: turn.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: turn.content }],
+  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${groqApiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history.map((turn) => ({
+          role: turn.role === 'assistant' ? 'assistant' : 'user',
+          content: turn.content,
         })),
-        generationConfig: { maxOutputTokens: 1024 },
-      }),
-    }
-  ).catch((err) => {
-    console.error('Gemini request failed', err)
+      ],
+      stream: true,
+      stream_options: { include_usage: true },
+    }),
+  }).catch((err) => {
+    console.error('Groq request failed', err)
     return null
   })
 
-  if (!geminiResponse?.ok || !geminiResponse.body) {
-    const errText = await geminiResponse?.text().catch(() => '')
-    console.error('Gemini error', geminiResponse?.status, errText)
+  if (!groqResponse?.ok || !groqResponse.body) {
+    const errText = await groqResponse?.text().catch(() => '')
+    console.error('Groq error', groqResponse?.status, errText)
     return jsonError('AI provider error', 502)
   }
 
-  return relayAsSse(parseGeminiStream(geminiResponse.body), 'gemini', onComplete)
+  return relayAsSse(parseGroqStream(groqResponse.body), 'groq', onComplete)
 }

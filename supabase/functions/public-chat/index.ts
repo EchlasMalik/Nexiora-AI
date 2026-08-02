@@ -21,8 +21,8 @@
 // same checks execute, not where they're decided.
 //
 // Deploy with: npx supabase functions deploy public-chat --no-verify-jwt
-// Secrets:     shares ANTHROPIC_API_KEY and GEMINI_API_KEY with chat-completion
-//              (already set there) — Gemini is an optional free-tier fallback
+// Secrets:     shares ANTHROPIC_API_KEY and GROQ_API_KEY with chat-completion
+//              (already set there) — Groq is an optional free-tier fallback
 //              used only when the Anthropic call fails, see streamAiReply
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -43,7 +43,7 @@ declare const Supabase: {
 }
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
       return jsonError(result.fallback_text!, 402)
     }
 
-    if (!ANTHROPIC_API_KEY && !GEMINI_API_KEY) {
+    if (!ANTHROPIC_API_KEY && !GROQ_API_KEY) {
       return jsonError('AI is not configured yet.', 503)
     }
 
@@ -129,15 +129,15 @@ Deno.serve(async (req: Request) => {
     const knowledgeText = await retrieveKnowledge(adminClient, embeddingModel, chatbotId, history)
     const systemPrompt = buildSystemPrompt(chatbot, knowledgeText)
 
-    return await streamAiReply(ANTHROPIC_API_KEY, GEMINI_API_KEY, systemPrompt, history, async (fullText, usage) => {
+    return await streamAiReply(ANTHROPIC_API_KEY, GROQ_API_KEY, systemPrompt, history, async (fullText, usage) => {
       const { error } = await adminClient.rpc('public_chat_complete', {
         p_org_id: chatbot.org_id,
         p_chatbot_id: chatbotId,
         p_conversation_id: conversationId,
         p_input_tokens: usage.inputTokens,
         p_output_tokens: usage.outputTokens,
-        // Gemini is a free-tier fallback — only Anthropic usage counts as spend.
-        p_estimated_cost_usd: usage.provider === 'gemini' ? 0 : estimateCostUsd(usage.inputTokens, usage.outputTokens),
+        // Groq is a free-tier fallback — only Anthropic usage counts as spend.
+        p_estimated_cost_usd: usage.provider === 'groq' ? 0 : estimateCostUsd(usage.inputTokens, usage.outputTokens),
         p_reply_text: fullText,
       })
       if (error) console.error('public_chat_complete error', error)

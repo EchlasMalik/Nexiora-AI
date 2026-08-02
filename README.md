@@ -37,7 +37,7 @@ A multi-tenant AI chatbot SaaS. Businesses create a chatbot trained on their own
 |---|---|
 | Frontend | React 19, TypeScript, Vite, Tailwind v4, shadcn/ui (radix-ui), framer-motion, react-router-dom, TanStack Query, Zod |
 | Backend | Supabase — Postgres, Auth, Realtime, Edge Functions (Deno) |
-| AI | Anthropic Claude, streamed via SSE, with an automatic free-tier Gemini fallback if Claude errors; Supabase's built-in `gte-small` model for embeddings; pgvector for retrieval |
+| AI | Anthropic Claude, streamed via SSE, with an automatic free-tier Groq fallback if Claude errors; Supabase's built-in `gte-small` model for embeddings; pgvector for retrieval |
 | Payments | Stripe (Checkout, Billing Portal, webhooks) |
 | Email | Resend |
 | Testing | Vitest (unit), Playwright (e2e) |
@@ -86,7 +86,7 @@ vercel.json              SPA routing + explicit build command for Vercel
 - Node.js 20+
 - A [Supabase](https://supabase.com) project
 - An [Anthropic API key](https://console.anthropic.com)
-- Optional: a free [Gemini API key](https://aistudio.google.com/apikey) — used as an automatic fallback if the Anthropic call fails (e.g. no credits)
+- Optional: a free [Groq API key](https://console.groq.com/keys) — used as an automatic fallback if the Anthropic call fails (e.g. no credits)
 - A [Stripe](https://dashboard.stripe.com) account (for billing)
 - A [Resend](https://resend.com) account (for email — optional, fails gracefully without it)
 - The [Supabase CLI](https://supabase.com/docs/guides/cli) (invoked via `npx supabase`, no global install needed)
@@ -110,14 +110,14 @@ VITE_SUPABASE_ANON_KEY="your-anon-key"
 SUPABASE_ACCESS_TOKEN="your-supabase-personal-access-token"
 ```
 
-Server-only secrets (Anthropic, Gemini, Stripe, Resend) are **never** put in `.env.local` for the app to read — they're pushed to Supabase Edge Function secrets instead, since anything prefixed `VITE_` gets inlined into the public client bundle:
+Server-only secrets (Anthropic, Groq, Stripe, Resend) are **never** put in `.env.local` for the app to read — they're pushed to Supabase Edge Function secrets instead, since anything prefixed `VITE_` gets inlined into the public client bundle:
 
 ```bash
 npx supabase link --project-ref your-project-ref
 
 npx supabase secrets set \
   ANTHROPIC_API_KEY=sk-ant-... \
-  GEMINI_API_KEY=... \
+  GROQ_API_KEY=... \
   STRIPE_SECRET_KEY=sk_live_... \
   STRIPE_WEBHOOK_SECRET=whsec_... \
   STRIPE_PRICE_STARTER=price_... \
@@ -126,7 +126,7 @@ npx supabase secrets set \
   RESEND_API_KEY=re_...
 ```
 
-`GEMINI_API_KEY` is optional but recommended: `chat-completion` and `public-chat` both try Claude first and only fall back to Gemini's free-tier `gemini-2.5-flash` model if the Anthropic call errors (out of credits, rate limited, etc). See `streamAiReply` in `supabase/functions/_shared/chat-core.ts`.
+`GROQ_API_KEY` is optional but recommended: `chat-completion` and `public-chat` both try Claude first and only fall back to Groq's free-tier `llama-3.3-70b-versatile` model if the Anthropic call errors (out of credits, rate limited, etc). Gemini was tried first but dropped — its free tier silently hangs when called from Supabase's own cloud IP range instead of returning an error. See `streamAiReply` in `supabase/functions/_shared/chat-core.ts`.
 
 ### Set up the database
 
