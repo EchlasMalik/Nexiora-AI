@@ -5,11 +5,13 @@ import type { WidgetChatbot } from '@/lib/ai'
 
 interface PublicWidgetLoaderProps {
   embedId: string
+  /** CSS selector of a host-page element the launcher should avoid covering on load (e.g. a hero marquee). */
+  avoidSelector?: string
 }
 
 type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; chatbot: WidgetChatbot }
 
-export function PublicWidgetLoader({ embedId }: PublicWidgetLoaderProps) {
+export function PublicWidgetLoader({ embedId, avoidSelector }: PublicWidgetLoaderProps) {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
 
   useEffect(() => {
@@ -40,5 +42,12 @@ export function PublicWidgetLoader({ embedId }: PublicWidgetLoaderProps) {
   // definitely shouldn't error-splash on someone else's site.
   if (state.status !== 'ready') return null
 
-  return <ChatWidget chatbot={state.chatbot} variant="embedded" getReply={streamPublicChatbotReply} />
+  return (
+    <ChatWidget
+      chatbot={state.chatbot}
+      variant="embedded"
+      getReply={streamPublicChatbotReply}
+      avoidSelector={avoidSelector}
+    />
+  )
 }

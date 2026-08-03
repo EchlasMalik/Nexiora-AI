@@ -9,6 +9,7 @@ import widgetStyles from '@/index.css?inline'
 function mount() {
   const scriptEl = document.currentScript as HTMLScriptElement | null
   const embedId = scriptEl?.dataset.chatbotId
+  const avoidSelector = scriptEl?.dataset.avoidSelector
 
   if (!embedId) {
     console.error('[Nexiora widget] missing data-chatbot-id attribute on the <script> tag.')
@@ -32,7 +33,7 @@ function mount() {
 
   createRoot(mountPoint).render(
     <StrictMode>
-      <PublicWidgetLoader embedId={embedId} />
+      <PublicWidgetLoader embedId={embedId} avoidSelector={avoidSelector} />
     </StrictMode>
   )
 }

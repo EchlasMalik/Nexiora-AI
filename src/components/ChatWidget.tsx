@@ -5,6 +5,7 @@ import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot 
 import type { SuggestedQuestion } from '@/entities'
 import { cn } from '@/lib/utils'
 import { LinkifiedText } from '@/components/LinkifiedText'
+import { useAvoidElementOffset } from '@/hooks/useAvoidElementOffset'
 
 interface ChatWidgetMessage extends ChatTurn {
   id: string
@@ -21,6 +22,8 @@ interface ChatWidgetProps {
    * Supabase session to call chat-completion with.
    */
   getReply?: GetReplyFn
+  /** CSS selector of a host-page element the launcher should avoid covering on load (e.g. a hero marquee). */
+  avoidSelector?: string
 }
 
 /** Darkens (negative percent) or lightens (positive) a hex color, e.g. for gradient shading. */
@@ -42,8 +45,15 @@ function shade(hex: string, percent: number): string {
   return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
 }
 
-export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = streamChatbotReply }: ChatWidgetProps) {
+export function ChatWidget({
+  chatbot,
+  onClose,
+  variant = 'full',
+  getReply = streamChatbotReply,
+  avoidSelector,
+}: ChatWidgetProps) {
   const [open, setOpen] = useState(variant === 'full')
+  const bottomOffset = useAvoidElementOffset(avoidSelector)
   const [messages, setMessages] = useState<ChatWidgetMessage[]>(() =>
     chatbot.welcome_message ? [{ id: 'welcome', role: 'assistant', content: chatbot.welcome_message }] : []
   )
@@ -146,8 +156,8 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
       <button
         onClick={() => setOpen(true)}
         aria-label={`Chat with ${chatbot.name}`}
-        className="fixed right-6 bottom-6 z-50 flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-transform hover:scale-105"
-        style={{ backgroundColor: themeColor }}
+        className="fixed right-6 z-50 flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-[bottom,transform] duration-300 ease-out hover:scale-105"
+        style={{ backgroundColor: themeColor, bottom: bottomOffset }}
       >
         <MessageCircle className="size-6" />
       </button>
@@ -290,7 +300,8 @@ export function ChatWidget({ chatbot, onClose, variant = 'full', getReply = stre
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-        className="fixed right-6 bottom-6 z-50"
+        className="fixed right-6 z-50 transition-[bottom] duration-300 ease-out"
+        style={{ bottom: bottomOffset }}
       >
         {widget}
       </motion.div>
