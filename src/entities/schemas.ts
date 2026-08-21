@@ -43,6 +43,12 @@ export const SuggestedQuestionSchema = z.object({
 })
 export type SuggestedQuestion = z.infer<typeof SuggestedQuestionSchema>
 
+export const ChatbotLinkSchema = z.object({
+  label: z.string().min(1),
+  url: z.string().min(1),
+})
+export type ChatbotLink = z.infer<typeof ChatbotLinkSchema>
+
 export const ChatbotInputSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   company_name: z.string().optional().default(''),
@@ -52,7 +58,10 @@ export const ChatbotInputSchema = z.object({
   welcome_message: z.string().optional().default(''),
   theme_color: z.string().default('#7C3AED'),
   avatar_url: z.string().optional().default(''),
+  logo_url: z.string().optional().default(''),
   suggested_questions: z.array(SuggestedQuestionSchema).default([]),
+  links: z.array(ChatbotLinkSchema).default([]),
+  faqs: z.array(SuggestedQuestionSchema).default([]),
   embed_id: z.string().optional().default(''),
   position: ChatbotPositionEnum.default('bottom-right'),
   powered_by_branding: z.boolean().default(true),

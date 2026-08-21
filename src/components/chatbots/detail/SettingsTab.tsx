@@ -4,7 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
-import { ChatbotRepo, type Chatbot, type ChatbotPosition, type SuggestedQuestion } from '@/entities'
+import {
+  ChatbotRepo,
+  type Chatbot,
+  type ChatbotPosition,
+  type ChatbotLink,
+  type SuggestedQuestion,
+} from '@/entities'
 import { CHATBOT_THEME_COLORS } from '@/lib/themeColors'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -13,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SuggestedQuestionsEditor } from '../SuggestedQuestionsEditor'
+import { LinksEditor } from '../LinksEditor'
 
 interface SettingsForm {
   name: string
@@ -30,6 +37,7 @@ interface BrandingForm {
   theme_color: string
   position: ChatbotPosition
   avatar_url: string
+  logo_url: string
 }
 
 export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
@@ -54,11 +62,18 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
     theme_color: chatbot.theme_color,
     position: chatbot.position,
     avatar_url: chatbot.avatar_url,
+    logo_url: chatbot.logo_url,
   })
   const [brandingSaved, setBrandingSaved] = useState(false)
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<SuggestedQuestion[]>(chatbot.suggested_questions)
   const [questionsSaved, setQuestionsSaved] = useState(false)
+
+  const [links, setLinks] = useState<ChatbotLink[]>(chatbot.links)
+  const [linksSaved, setLinksSaved] = useState(false)
+
+  const [faqs, setFaqs] = useState<SuggestedQuestion[]>(chatbot.faqs)
+  const [faqsSaved, setFaqsSaved] = useState(false)
 
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -100,6 +115,26 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
       queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
       setQuestionsSaved(true)
       setTimeout(() => setQuestionsSaved(false), 2500)
+    },
+  })
+
+  const linksMutation = useMutation({
+    mutationFn: () => ChatbotRepo.update(orgId!, chatbot.id, { links }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['chatbot', orgId, chatbot.id], updated)
+      queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
+      setLinksSaved(true)
+      setTimeout(() => setLinksSaved(false), 2500)
+    },
+  })
+
+  const faqsMutation = useMutation({
+    mutationFn: () => ChatbotRepo.update(orgId!, chatbot.id, { faqs }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['chatbot', orgId, chatbot.id], updated)
+      queryClient.invalidateQueries({ queryKey: ['chatbots', orgId] })
+      setFaqsSaved(true)
+      setTimeout(() => setFaqsSaved(false), 2500)
     },
   })
 
@@ -283,6 +318,16 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
             />
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="settings-logo">Logo URL</Label>
+            <Input
+              id="settings-logo"
+              value={branding.logo_url}
+              onChange={(e) => updateBranding({ logo_url: e.target.value })}
+              placeholder="https://your-cdn.com/logo.png"
+            />
+          </div>
+
           <div className="flex items-center gap-3">
             <Button type="button" onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
               {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
@@ -307,6 +352,48 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
               {questionsMutation.isPending ? 'Saving…' : 'Save questions'}
             </Button>
             {questionsSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Links</CardTitle>
+          <CardDescription>
+            Custom links shown on your widget's Home tab — social profiles, community links, docs, anything you
+            want a visitor one tap away from.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <LinksEditor value={links} onChange={setLinks} />
+          <div className="flex items-center gap-3">
+            <Button type="button" onClick={() => linksMutation.mutate()} disabled={linksMutation.isPending}>
+              {linksMutation.isPending ? 'Saving…' : 'Save links'}
+            </Button>
+            {linksSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Help FAQs</CardTitle>
+          <CardDescription>
+            A static reference list shown in your widget's Help tab — separate from the tappable suggested
+            questions above. The Help tab only appears once at least one FAQ is added here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <SuggestedQuestionsEditor
+            value={faqs}
+            onChange={setFaqs}
+            answerPlaceholder="Answer shown to visitors in the Help tab"
+          />
+          <div className="flex items-center gap-3">
+            <Button type="button" onClick={() => faqsMutation.mutate()} disabled={faqsMutation.isPending}>
+              {faqsMutation.isPending ? 'Saving…' : 'Save FAQs'}
+            </Button>
+            {faqsSaved && <span className="text-sm font-medium text-emerald-600">✓ Saved</span>}
           </div>
         </CardContent>
       </Card>

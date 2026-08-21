@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
     const { data: chatbot, error } = await adminClient
       .from('chatbots')
       .select(
-        'id, name, welcome_message, theme_color, avatar_url, suggested_questions, position, powered_by_branding, fallback_message, status'
+        'id, name, welcome_message, theme_color, avatar_url, logo_url, suggested_questions, links, faqs, position, powered_by_branding, fallback_message, status'
       )
       .eq('embed_id', embedId)
       .maybeSingle()

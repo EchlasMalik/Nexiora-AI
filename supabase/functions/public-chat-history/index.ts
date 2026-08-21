@@ -68,6 +68,7 @@ Deno.serve(async (req: Request) => {
         // concept of a third role.
         role: row.role === 'user' ? 'user' : 'assistant',
         content: row.content,
+        created_date: row.created_date,
       }))
 
     return new Response(JSON.stringify({ messages }), {

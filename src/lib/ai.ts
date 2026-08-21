@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { consumeSSEStream } from './sseStream'
-import type { SuggestedQuestion } from '@/entities'
+import type { ChatbotLink, SuggestedQuestion } from '@/entities'
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -20,7 +20,10 @@ export interface WidgetChatbot {
   welcome_message: string
   theme_color: string
   avatar_url: string
+  logo_url: string
   suggested_questions: SuggestedQuestion[]
+  links: ChatbotLink[]
+  faqs: SuggestedQuestion[]
   fallback_message: string
   powered_by_branding: boolean
 }

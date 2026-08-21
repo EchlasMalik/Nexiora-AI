@@ -8,9 +8,15 @@ import type { SuggestedQuestion } from '@/entities'
 interface SuggestedQuestionsEditorProps {
   value: SuggestedQuestion[]
   onChange: (next: SuggestedQuestion[]) => void
+  /** Overrides the answer field's placeholder — this editor is also reused for the Help tab's static FAQ list, which needs different copy than the default chat-starter framing. */
+  answerPlaceholder?: string
 }
 
-export function SuggestedQuestionsEditor({ value, onChange }: SuggestedQuestionsEditorProps) {
+export function SuggestedQuestionsEditor({
+  value,
+  onChange,
+  answerPlaceholder = 'Fixed answer shown instantly when a visitor taps this question — leave blank to let the AI answer instead',
+}: SuggestedQuestionsEditorProps) {
   const [questionDraft, setQuestionDraft] = useState('')
 
   function addQuestion() {
@@ -68,7 +74,7 @@ export function SuggestedQuestionsEditor({ value, onChange }: SuggestedQuestions
               <Textarea
                 value={qa.answer}
                 onChange={(e) => updateAnswer(index, e.target.value)}
-                placeholder="Fixed answer shown instantly when a visitor taps this question — leave blank to let the AI answer instead"
+                placeholder={answerPlaceholder}
                 rows={2}
                 className="mt-2 bg-white text-sm"
               />

@@ -29,11 +29,14 @@ export async function fetchChatHistory(chatbotId: string): Promise<ChatWidgetMes
     })
     if (!response.ok) return []
 
-    const body = (await response.json()) as { messages?: { id: string; role: string; content: string }[] }
+    const body = (await response.json()) as {
+      messages?: { id: string; role: string; content: string; created_date: string }[]
+    }
     return (body.messages ?? []).map((message) => ({
       id: message.id,
       role: message.role === 'user' ? 'user' : 'assistant',
       content: message.content,
+      created_date: message.created_date,
     }))
   } catch {
     return []
