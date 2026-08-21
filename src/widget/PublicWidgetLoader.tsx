@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChatWidget } from '@/components/ChatWidget'
-import { streamPublicChatbotReply } from '@/lib/publicAi'
+import { fetchChatHistory, streamPublicChatbotReply } from '@/lib/publicAi'
 import type { WidgetChatbot } from '@/lib/ai'
 
 interface PublicWidgetLoaderProps {
@@ -47,6 +47,7 @@ export function PublicWidgetLoader({ embedId, avoidSelector }: PublicWidgetLoade
       chatbot={state.chatbot}
       variant="embedded"
       getReply={streamPublicChatbotReply}
+      getHistory={(chatbot) => fetchChatHistory(chatbot.id)}
       avoidSelector={avoidSelector}
     />
   )

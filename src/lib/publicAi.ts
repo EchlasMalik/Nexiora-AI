@@ -1,15 +1,43 @@
+import type { ChatWidgetMessage } from '@/components/ChatWidget'
 import type { GetReplyFn } from './ai'
 import { consumeSSEStream } from './sseStream'
 
 const SESSION_KEY = 'nexiora:widget_session_id'
 
-function getVisitorSessionId(): string {
+export function getVisitorSessionId(): string {
   let id = localStorage.getItem(SESSION_KEY)
   if (!id) {
     id = crypto.randomUUID()
     localStorage.setItem(SESSION_KEY, id)
   }
   return id
+}
+
+/**
+ * Fetches a returning visitor's prior conversation for a chatbot from the
+ * anonymous `public-chat-history` Edge Function, keyed by the same
+ * localStorage-backed session id `streamPublicChatbotReply` already sends.
+ * Fails soft to an empty array on any error — the widget treats that
+ * identically to a first-ever visit.
+ */
+export async function fetchChatHistory(chatbotId: string): Promise<ChatWidgetMessage[]> {
+  try {
+    const functionsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-chat-history`
+    const url = `${functionsUrl}?chatbot_id=${encodeURIComponent(chatbotId)}&session_id=${encodeURIComponent(getVisitorSessionId())}`
+    const response = await fetch(url, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+    })
+    if (!response.ok) return []
+
+    const body = (await response.json()) as { messages?: { id: string; role: string; content: string }[] }
+    return (body.messages ?? []).map((message) => ({
+      id: message.id,
+      role: message.role === 'user' ? 'user' : 'assistant',
+      content: message.content,
+    }))
+  } catch {
+    return []
+  }
 }
 
 /**

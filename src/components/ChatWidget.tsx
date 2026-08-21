@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { LinkifiedText } from '@/components/LinkifiedText'
 import { useAvoidElementOffset } from '@/hooks/useAvoidElementOffset'
 
-interface ChatWidgetMessage extends ChatTurn {
+export interface ChatWidgetMessage extends ChatTurn {
   id: string
 }
 
@@ -22,6 +22,12 @@ interface ChatWidgetProps {
    * Supabase session to call chat-completion with.
    */
   getReply?: GetReplyFn
+  /**
+   * Fetches a returning visitor's prior conversation, if any. Only passed by
+   * the public embeddable widget (`PublicWidgetLoader`) — omitted for the
+   * dashboard's Live Preview / demo pages, which always start fresh.
+   */
+  getHistory?: (chatbot: WidgetChatbot) => Promise<ChatWidgetMessage[]>
   /** CSS selector of a host-page element the launcher should avoid covering on load (e.g. a hero marquee). */
   avoidSelector?: string
 }
@@ -50,6 +56,7 @@ export function ChatWidget({
   onClose,
   variant = 'full',
   getReply = streamChatbotReply,
+  getHistory,
   avoidSelector,
 }: ChatWidgetProps) {
   const [open, setOpen] = useState(variant === 'full')
@@ -63,6 +70,7 @@ export function ChatWidget({
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const historyFetchedRef = useRef(false)
   const themeColor = chatbot.theme_color || '#7C3AED'
 
   useEffect(() => {
@@ -75,6 +83,25 @@ export function ChatWidget({
       if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
     }
   }, [])
+
+  // Restores a returning visitor's prior conversation the first time they
+  // open the widget — fetched on open rather than on mount, so a visitor who
+  // never opens it never costs an extra request.
+  useEffect(() => {
+    if (!open || !getHistory || historyFetchedRef.current) return
+    historyFetchedRef.current = true
+    let cancelled = false
+    getHistory(chatbot).then((history) => {
+      if (cancelled || history.length === 0) return
+      // A slow fetch shouldn't stomp a message the visitor already sent
+      // while it was in flight.
+      setMessages((prev) => (prev.length <= 1 ? history : prev))
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch once per open, guarded by historyFetchedRef
+  }, [open])
 
   function handleClose() {
     setOpen(false)
