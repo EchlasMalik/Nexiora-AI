@@ -8,18 +8,20 @@
 // server-trusted checks chained together (chatbot lookup, accepts_appointments
 // gate, rate limit, conversation lookup, insert) in one round trip.
 //
-// The confirmation email is built and sent directly here via the shared
-// template + sendEmail helper, rather than calling the authenticated
+// The email is built and sent directly here via the shared template +
+// sendEmail helper, rather than calling the authenticated
 // send-appointment-confirmation function — that function requires a signed-in
 // session and verifies org membership, which an anonymous visitor can never
 // satisfy, and weakening that check would open up an unrelated authenticated
-// action.
+// action. Sent with status 'pending' since a widget booking is never
+// auto-confirmed — the "confirmed" email only goes out once an owner
+// actually confirms it from the dashboard (see send-appointment-confirmation).
 //
 // Deploy with: npx supabase functions deploy public-book-appointment --no-verify-jwt
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
-import { buildAppointmentConfirmationEmail } from '../_shared/appointmentEmail.ts'
+import { buildAppointmentEmail } from '../_shared/appointmentEmail.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -111,11 +113,12 @@ Deno.serve(async (req: Request) => {
           .eq('id', result.org_id)
           .maybeSingle()
 
-        const { subject, html } = buildAppointmentConfirmationEmail({
+        const { subject, html } = buildAppointmentEmail({
           contactName: contactName.trim(),
           orgName: org?.name || 'Nexiora AI',
           scheduledAt,
           notes: notes ?? '',
+          status: 'pending',
         })
         await sendEmail({ to: contactEmail.trim(), subject, html })
       } catch (err) {

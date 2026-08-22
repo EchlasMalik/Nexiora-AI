@@ -1,9 +1,11 @@
-// Nexiora AI — shared appointment-confirmation email template
+// Nexiora AI — shared appointment email templates
 //
-// Used by both send-appointment-confirmation (authenticated — dashboard
-// manual bookings) and public-book-appointment (anonymous — widget
-// bookings), so a confirmation reads identically regardless of which side
-// created the appointment.
+// Used by both send-appointment-confirmation (authenticated — fires on
+// manual dashboard bookings, and when an owner confirms a pending one) and
+// public-book-appointment (anonymous — widget bookings, always created
+// pending), so wording always matches the appointment's real status: a
+// widget-sourced booking is only ever "requested" until a human confirms it,
+// never auto-confirmed.
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
@@ -22,21 +24,9 @@ function escapeHtml(value: string): string {
   })
 }
 
-export interface AppointmentConfirmationInput {
-  contactName: string
-  orgName: string
-  scheduledAt: string | null
-  notes: string
-}
-
-export function buildAppointmentConfirmationEmail({
-  contactName,
-  orgName,
-  scheduledAt,
-  notes,
-}: AppointmentConfirmationInput): { subject: string; html: string } {
+function formatScheduledLabel(scheduledAt: string | null): string {
   const scheduledDate = scheduledAt ? new Date(scheduledAt) : null
-  const scheduledLabel = scheduledDate
+  return scheduledDate
     ? scheduledDate.toLocaleString('en-US', {
         weekday: 'long',
         month: 'long',
@@ -47,18 +37,49 @@ export function buildAppointmentConfirmationEmail({
         timeZoneName: 'short',
       })
     : 'To be confirmed'
+}
 
+export interface AppointmentEmailInput {
+  contactName: string
+  orgName: string
+  scheduledAt: string | null
+  notes: string
+  /** Whether this appointment has actually been confirmed by the business yet. */
+  status: 'pending' | 'confirmed'
+}
+
+export function buildAppointmentEmail({
+  contactName,
+  orgName,
+  scheduledAt,
+  notes,
+  status,
+}: AppointmentEmailInput): { subject: string; html: string } {
+  const scheduledLabel = formatScheduledLabel(scheduledAt)
   const safeName = escapeHtml(contactName || 'there')
   const safeOrgName = escapeHtml(orgName)
   const safeNotes = notes ? escapeHtml(notes) : ''
 
+  const copy =
+    status === 'confirmed'
+      ? {
+          subject: `Your appointment with ${orgName} is confirmed`,
+          heading: 'Appointment confirmed',
+          intro: `Your appointment with <strong>${safeOrgName}</strong> is confirmed for:`,
+        }
+      : {
+          subject: `Your appointment request with ${orgName} has been received`,
+          heading: 'Request received',
+          intro: `<strong>${safeOrgName}</strong> received your appointment request for the time below and will confirm it shortly:`,
+        }
+
   return {
-    subject: `Your appointment with ${orgName} is confirmed`,
+    subject: copy.subject,
     html: `
       <div style="font-family: -apple-system, Segoe UI, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1d4ed8;">Appointment confirmed</h2>
+        <h2 style="color: #1d4ed8;">${copy.heading}</h2>
         <p>Hi ${safeName},</p>
-        <p>Your appointment with <strong>${safeOrgName}</strong> is confirmed for:</p>
+        <p>${copy.intro}</p>
         <p style="font-size: 16px; font-weight: 600; padding: 12px 16px; background: #eff6ff; border-radius: 8px;">
           ${escapeHtml(scheduledLabel)}
         </p>

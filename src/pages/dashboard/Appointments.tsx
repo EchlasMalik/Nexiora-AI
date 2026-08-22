@@ -98,8 +98,17 @@ export default function Appointments() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
       AppointmentRepo.update(orgId!, id, { status }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['appointments', orgId] })
+
+      // Only appointments created pending (e.g. from the widget) reach this —
+      // the manual-create flow above already sends its own email immediately
+      // since it's created 'confirmed' from the start.
+      if (updated.status === 'confirmed' && updated.contact_email) {
+        sendAppointmentConfirmation(updated.id).catch(() => {
+          toast.error("Status updated, but the confirmation email couldn't be sent.")
+        })
+      }
     },
   })
 

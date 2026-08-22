@@ -12,7 +12,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
-import { buildAppointmentConfirmationEmail } from '../_shared/appointmentEmail.ts'
+import { buildAppointmentEmail } from '../_shared/appointmentEmail.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: appointment, error: appointmentError } = await adminClient
       .from('appointments')
-      .select('contact_name, contact_email, scheduled_at, notes, org_id')
+      .select('contact_name, contact_email, scheduled_at, notes, status, org_id')
       .eq('id', appointmentId)
       .eq('org_id', membership.org_id)
       .maybeSingle()
@@ -71,11 +71,12 @@ Deno.serve(async (req: Request) => {
     const { data: org } = await adminClient.from('orgs').select('name').eq('id', membership.org_id).maybeSingle()
     const orgName = org?.name || 'Nexiora AI'
 
-    const { subject, html } = buildAppointmentConfirmationEmail({
+    const { subject, html } = buildAppointmentEmail({
       contactName: appointment.contact_name,
       orgName,
       scheduledAt: appointment.scheduled_at,
       notes: appointment.notes,
+      status: appointment.status === 'confirmed' ? 'confirmed' : 'pending',
     })
 
     await sendEmail({ to: appointment.contact_email, subject, html })
