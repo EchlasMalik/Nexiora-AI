@@ -6,6 +6,7 @@ import { Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { defaultPreferences, getPreferences, savePreferences, type UserPreferences } from '@/lib/preferences'
+import { getOrgNotificationSettings, updateOrgNotificationSettings, type OrgNotificationSettings } from '@/lib/orgPreferences'
 import { exportOrgData } from '@/lib/dataExport'
 import { fetchSubscription } from '@/lib/billing'
 import { supabase } from '@/lib/supabase'
@@ -38,11 +39,19 @@ const PLAN_LABELS: Record<string, { name: string; price: string }> = {
   enterprise: { name: 'Enterprise', price: 'Custom' },
 }
 
-const NOTIFICATIONS: { key: keyof UserPreferences; label: string; description: string }[] = [
+const NOTIFICATIONS: { key: keyof Omit<OrgNotificationSettings, 'notification_email'>; label: string; description: string }[] = [
   { key: 'notify_new_lead', label: 'New lead', description: 'A visitor is captured as a lead.' },
   { key: 'notify_appointment', label: 'Appointment', description: 'A new appointment is booked.' },
-  { key: 'notify_escalation', label: 'Escalation', description: 'A conversation is handed off to a human.' },
-  { key: 'notify_weekly_summary', label: 'Weekly summary', description: 'A digest of activity every Monday.' },
+  {
+    key: 'notify_escalation',
+    label: 'Escalation',
+    description: 'A conversation is handed off to a human. (Coming soon — not yet wired to send anything.)',
+  },
+  {
+    key: 'notify_weekly_summary',
+    label: 'Weekly summary',
+    description: 'A digest of activity every Monday. (Coming soon — not yet wired to send anything.)',
+  },
 ]
 
 export default function Settings() {
@@ -52,6 +61,7 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState(user?.name ?? '')
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences)
+  const [orgNotifications, setOrgNotifications] = useState<OrgNotificationSettings | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [deleteArmed, setDeleteArmed] = useState(false)
@@ -64,12 +74,27 @@ export default function Settings() {
     enabled: !!orgId,
   })
 
+  const { data: fetchedOrgNotifications } = useQuery({
+    queryKey: ['org-notification-settings', orgId],
+    queryFn: () => getOrgNotificationSettings(orgId!),
+    enabled: !!orgId,
+  })
+
   useEffect(() => {
     if (orgId) setPreferences(getPreferences(orgId))
   }, [orgId])
 
+  useEffect(() => {
+    if (fetchedOrgNotifications) setOrgNotifications(fetchedOrgNotifications)
+  }, [fetchedOrgNotifications])
+
   function updatePreference<K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) {
     setPreferences((prev) => ({ ...prev, [key]: value }))
+    setJustSaved(false)
+  }
+
+  function updateOrgNotification<K extends keyof OrgNotificationSettings>(key: K, value: OrgNotificationSettings[K]) {
+    setOrgNotifications((prev) => (prev ? { ...prev, [key]: value } : prev))
     setJustSaved(false)
   }
 
@@ -79,6 +104,7 @@ export default function Settings() {
     try {
       await updateProfile({ name: fullName.trim() })
       savePreferences(orgId, preferences)
+      if (orgNotifications) await updateOrgNotificationSettings(orgId, orgNotifications)
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 2500)
     } catch (err) {
@@ -165,11 +191,26 @@ export default function Settings() {
               <CardDescription>Choose what you want to hear about.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="notification-email">Notification email</Label>
+                <Input
+                  id="notification-email"
+                  type="email"
+                  value={orgNotifications?.notification_email ?? ''}
+                  onChange={(e) => updateOrgNotification('notification_email', e.target.value)}
+                  placeholder={user?.email || 'you@example.com'}
+                  disabled={!orgNotifications}
+                />
+                <p className="text-xs text-brand-text-secondary">
+                  Leave blank to use your login email above.
+                </p>
+              </div>
               {NOTIFICATIONS.map((item) => (
                 <label key={item.key} className="flex cursor-pointer items-start gap-3">
                   <Checkbox
-                    checked={preferences[item.key] as boolean}
-                    onCheckedChange={(checked) => updatePreference(item.key, checked === true)}
+                    checked={orgNotifications ? orgNotifications[item.key] : false}
+                    onCheckedChange={(checked) => updateOrgNotification(item.key, checked === true)}
+                    disabled={!orgNotifications}
                     className="mt-0.5"
                   />
                   <div>

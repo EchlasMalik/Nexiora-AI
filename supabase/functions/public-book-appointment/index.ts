@@ -22,6 +22,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
 import { buildAppointmentEmail } from '../_shared/appointmentEmail.ts'
+import { notifyOrgOwner } from '../_shared/ownerNotification.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -125,6 +126,23 @@ Deno.serve(async (req: Request) => {
         // The appointment already exists — an email hiccup shouldn't undo it.
         console.error('booking confirmation email failed', err)
       }
+    }
+
+    try {
+      await notifyOrgOwner(adminClient, {
+        orgId: result.org_id!,
+        kind: 'new_appointment',
+        contactName: contactName.trim(),
+        detailLine: `Requested for ${new Date(scheduledAt).toLocaleString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })}`,
+      })
+    } catch (err) {
+      console.error('owner notification failed', err)
     }
 
     return new Response(JSON.stringify({ success: true, appointmentId: result.appointment_id }), {

@@ -28,6 +28,7 @@ export interface WidgetChatbot {
   powered_by_branding: boolean
   booking_url: string
   accepts_appointments: boolean
+  accepts_lead_capture: boolean
 }
 
 export interface GetReplyOptions {

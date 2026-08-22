@@ -33,6 +33,7 @@ interface SettingsForm {
   custom_prompt: string
   booking_url: string
   accepts_appointments: boolean
+  accepts_lead_capture: boolean
 }
 
 interface BrandingForm {
@@ -58,6 +59,7 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
     custom_prompt: chatbot.custom_prompt,
     booking_url: chatbot.booking_url,
     accepts_appointments: chatbot.accepts_appointments,
+    accepts_lead_capture: chatbot.accepts_lead_capture,
   })
   const [justSaved, setJustSaved] = useState(false)
 
@@ -266,6 +268,20 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
               id="settings-accepts-appointments"
               checked={form.accepts_appointments}
               onCheckedChange={(checked) => update({ accepts_appointments: checked })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+            <div>
+              <Label htmlFor="settings-accepts-leads">Accept "Leave your details" in the chat widget</Label>
+              <p className="mt-0.5 text-sm text-brand-text-secondary">
+                Lets visitors leave their contact details for a follow-up, without booking a specific time. New
+                leads appear on your Contacts page.
+              </p>
+            </div>
+            <Switch
+              id="settings-accepts-leads"
+              checked={form.accepts_lead_capture}
+              onCheckedChange={(checked) => update({ accepts_lead_capture: checked })}
             />
           </div>
         </CardContent>

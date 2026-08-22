@@ -1,19 +1,15 @@
+// Notification toggles used to live here too, but a browser's localStorage
+// can never be read by a server-side Edge Function — so they've moved to
+// real org columns (`src/lib/orgPreferences.ts`) where notifyOrgOwner can
+// actually check them. workspace_name/timezone stay local for now.
 export interface UserPreferences {
   workspace_name: string
   timezone: string
-  notify_new_lead: boolean
-  notify_appointment: boolean
-  notify_escalation: boolean
-  notify_weekly_summary: boolean
 }
 
 export const defaultPreferences: UserPreferences = {
   workspace_name: '',
   timezone: 'America/New_York',
-  notify_new_lead: true,
-  notify_appointment: true,
-  notify_escalation: true,
-  notify_weekly_summary: false,
 }
 
 function key(orgId: string) {

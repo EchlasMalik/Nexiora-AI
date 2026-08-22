@@ -26,7 +26,7 @@ const features = [
   {
     icon: BarChart3,
     title: 'Analytics',
-    description: 'Track sentiment, lead score, and conversation volume across every chatbot.',
+    description: 'Track conversation volume, leads, and appointments across every chatbot.',
   },
   {
     icon: Users,

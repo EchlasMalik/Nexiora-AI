@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot } from '@/lib/ai'
 import { bookAppointment } from '@/lib/publicBooking'
+import { captureLead } from '@/lib/publicLead'
 import type { SuggestedQuestion } from '@/entities'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/relativeTime'
@@ -25,8 +26,8 @@ export interface ChatWidgetMessage extends ChatTurn {
   created_date: string
 }
 
-type WidgetTab = 'home' | 'messages' | 'help' | 'book'
-type BookingStatus = 'idle' | 'submitting' | 'success' | 'error'
+type WidgetTab = 'home' | 'messages' | 'help' | 'book' | 'lead'
+type FormStatus = 'idle' | 'submitting' | 'success' | 'error'
 
 interface ChatWidgetProps {
   chatbot: WidgetChatbot
@@ -93,8 +94,14 @@ export function ChatWidget({
   const [bookPhone, setBookPhone] = useState('')
   const [bookScheduledAt, setBookScheduledAt] = useState('')
   const [bookNotes, setBookNotes] = useState('')
-  const [bookStatus, setBookStatus] = useState<BookingStatus>('idle')
+  const [bookStatus, setBookStatus] = useState<FormStatus>('idle')
   const [bookError, setBookError] = useState('')
+  const [leadName, setLeadName] = useState('')
+  const [leadEmail, setLeadEmail] = useState('')
+  const [leadPhone, setLeadPhone] = useState('')
+  const [leadMessage, setLeadMessage] = useState('')
+  const [leadStatus, setLeadStatus] = useState<FormStatus>('idle')
+  const [leadError, setLeadError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -259,6 +266,39 @@ export function ChatWidget({
     setTab('home')
   }
 
+  async function handleCaptureLead(e: FormEvent) {
+    e.preventDefault()
+    if (!leadName.trim() || (!leadEmail.trim() && !leadPhone.trim()) || leadStatus === 'submitting') return
+
+    setLeadStatus('submitting')
+    setLeadError('')
+
+    const result = await captureLead({
+      chatbotId: chatbot.id,
+      name: leadName.trim(),
+      email: leadEmail.trim(),
+      phone: leadPhone.trim(),
+      requirements: leadMessage.trim(),
+    })
+
+    if (result.ok) {
+      setLeadStatus('success')
+    } else {
+      setLeadStatus('error')
+      setLeadError(result.error)
+    }
+  }
+
+  function resetLeadForm() {
+    setLeadName('')
+    setLeadEmail('')
+    setLeadPhone('')
+    setLeadMessage('')
+    setLeadStatus('idle')
+    setLeadError('')
+    setTab('home')
+  }
+
   if (variant === 'embedded' && !open) {
     return (
       <button
@@ -328,7 +368,13 @@ export function ChatWidget({
         {avatar}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-tight">
-            {tab === 'help' ? 'Help' : tab === 'book' ? 'Book an appointment' : chatbot.name}
+            {tab === 'help'
+              ? 'Help'
+              : tab === 'book'
+                ? 'Book an appointment'
+                : tab === 'lead'
+                  ? 'Leave your details'
+                  : chatbot.name}
           </p>
           {tab === 'messages' && (
             <p className="flex items-center gap-1.5 text-xs text-white/80">
@@ -383,6 +429,16 @@ export function ChatWidget({
               className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
             >
               Book an appointment
+              <ChevronRight className="size-4 shrink-0 text-brand-text-secondary" />
+            </button>
+          )}
+
+          {chatbot.accepts_lead_capture && (
+            <button
+              onClick={() => setTab('lead')}
+              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
+            >
+              Leave your details
               <ChevronRight className="size-4 shrink-0 text-brand-text-secondary" />
             </button>
           )}
@@ -549,6 +605,90 @@ export function ChatWidget({
                 style={{ backgroundColor: themeColor }}
               >
                 {bookStatus === 'submitting' ? 'Booking…' : 'Book appointment'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {tab === 'lead' && (
+        <div className="flex-1 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+          {leadStatus === 'success' ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center shadow-sm">
+              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <Check className="size-6" />
+              </div>
+              <p className="text-sm font-medium text-brand-navy">Thanks!</p>
+              <p className="text-sm text-brand-text-secondary">We've got your details and will be in touch.</p>
+              <button
+                onClick={resetLeadForm}
+                className="cursor-pointer rounded-full px-4 py-2 text-sm font-medium text-white transition-all hover:scale-105 active:scale-95"
+                style={{ backgroundColor: themeColor }}
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleCaptureLead} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="lead-name" className="text-xs font-medium text-brand-text-secondary">
+                  Name
+                </label>
+                <input
+                  id="lead-name"
+                  value={leadName}
+                  onChange={(e) => setLeadName(e.target.value)}
+                  required
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="lead-email" className="text-xs font-medium text-brand-text-secondary">
+                  Email
+                </label>
+                <input
+                  id="lead-email"
+                  type="email"
+                  value={leadEmail}
+                  onChange={(e) => setLeadEmail(e.target.value)}
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="lead-phone" className="text-xs font-medium text-brand-text-secondary">
+                  Phone
+                </label>
+                <input
+                  id="lead-phone"
+                  type="tel"
+                  value={leadPhone}
+                  onChange={(e) => setLeadPhone(e.target.value)}
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <p className="text-xs text-brand-text-secondary">Leave at least an email or a phone number.</p>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="lead-message" className="text-xs font-medium text-brand-text-secondary">
+                  What can we help with? (optional)
+                </label>
+                <textarea
+                  id="lead-message"
+                  rows={3}
+                  value={leadMessage}
+                  onChange={(e) => setLeadMessage(e.target.value)}
+                  className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+
+              {leadStatus === 'error' && <p className="text-sm text-destructive">{leadError}</p>}
+
+              <button
+                type="submit"
+                disabled={!leadName.trim() || (!leadEmail.trim() && !leadPhone.trim()) || leadStatus === 'submitting'}
+                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all enabled:hover:scale-[1.02] enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ backgroundColor: themeColor }}
+              >
+                {leadStatus === 'submitting' ? 'Sending…' : 'Send'}
               </button>
             </form>
           )}
