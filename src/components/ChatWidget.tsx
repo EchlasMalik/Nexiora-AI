@@ -208,7 +208,7 @@ export function ChatWidget({
       <button
         onClick={() => setOpen(true)}
         aria-label={`Chat with ${chatbot.name}`}
-        className="fixed right-6 z-50 flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-[bottom,transform] duration-300 ease-out hover:scale-105"
+        className="fixed right-6 z-50 flex size-14 cursor-pointer items-center justify-center rounded-full text-white shadow-xl transition-[bottom,transform] duration-300 ease-out hover:scale-110 active:scale-95"
         style={{ backgroundColor: themeColor, bottom: bottomOffset }}
       >
         <MessageCircle className="size-6" />
@@ -240,7 +240,7 @@ export function ChatWidget({
     <button
       onClick={handleClose}
       aria-label="Close chat"
-      className="flex size-7 shrink-0 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+      className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15 active:scale-90"
     >
       <X className="size-4" />
     </button>
@@ -296,7 +296,7 @@ export function ChatWidget({
         <div className="flex-1 space-y-3 overflow-y-auto bg-[#faf9fc] px-4 py-4">
           <button
             onClick={() => setTab('messages')}
-            className="w-full rounded-2xl border border-border bg-white p-3 text-left shadow-sm hover:border-violet-200"
+            className="w-full cursor-pointer rounded-2xl border border-border bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
           >
             {hasRealHistory && lastMessage ? (
               <>
@@ -325,7 +325,7 @@ export function ChatWidget({
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-sm font-medium text-brand-navy shadow-sm hover:border-violet-200"
+              className="flex cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
             >
               {link.label}
               <ExternalLink className="size-4 shrink-0 text-brand-text-secondary" />
@@ -335,7 +335,7 @@ export function ChatWidget({
           {hasHelp && (
             <button
               onClick={() => setTab('help')}
-              className="flex w-full items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-brand-navy shadow-sm hover:border-violet-200"
+              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
             >
               Help
               <ChevronRight className="size-4 shrink-0 text-brand-text-secondary" />
@@ -349,10 +349,13 @@ export function ChatWidget({
           {chatbot.faqs.map((faq, index) => {
             const isExpanded = expandedFaqIndex === index
             return (
-              <div key={`${faq.question}-${index}`} className="rounded-2xl border border-border bg-white shadow-sm">
+              <div
+                key={`${faq.question}-${index}`}
+                className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
+              >
                 <button
                   onClick={() => setExpandedFaqIndex(isExpanded ? null : index)}
-                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-brand-navy"
+                  className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-brand-navy transition-colors hover:bg-slate-50"
                 >
                   {faq.question}
                   <ChevronDown
@@ -430,7 +433,7 @@ export function ChatWidget({
                   <button
                     key={qa.question}
                     onClick={() => handleSuggestedQuestion(qa)}
-                    className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+                    className="cursor-pointer rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 transition-all hover:scale-105 hover:bg-violet-100 active:scale-95"
                   >
                     {qa.question}
                   </button>
@@ -452,7 +455,7 @@ export function ChatWidget({
               onClick={() => sendMessage(draft)}
               disabled={!draft.trim() || isResponding}
               aria-label="Send message"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+              className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-white transition-all enabled:hover:scale-110 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ backgroundColor: themeColor }}
             >
               <Send className="size-4" />
@@ -475,7 +478,7 @@ export function ChatWidget({
             <button
               key={item.key}
               onClick={() => setTab(item.key)}
-              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium"
+              className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors hover:bg-slate-50 active:bg-slate-100"
               style={{ color: isActive ? themeColor : undefined }}
             >
               <Icon className={cn('size-5', !isActive && 'text-brand-text-secondary')} />
