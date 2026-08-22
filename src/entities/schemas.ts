@@ -70,6 +70,7 @@ export const ChatbotInputSchema = z.object({
   fallback_message: z.string().optional().default(''),
   custom_prompt: z.string().optional().default(''),
   booking_url: z.string().optional().default(''),
+  accepts_appointments: z.boolean().default(true),
   status: ChatbotStatusEnum.default('active'),
 })
 export type ChatbotInput = z.infer<typeof ChatbotInputSchema>

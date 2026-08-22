@@ -1,13 +1,15 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, Calendar, Check, CheckCheck, Clock, Plus, X } from 'lucide-react'
+import { isSameDay } from 'date-fns'
+import { AlertTriangle, Calendar, Check, CheckCheck, Clock, List, Plus, X } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
 import { AppointmentRepo, type Appointment, type AppointmentStatus } from '@/entities'
 import { sendAppointmentConfirmation } from '@/lib/email'
 import { CONFLICT_BUFFER_MINUTES, findConflict } from '@/lib/appointmentConflicts'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { AppointmentCalendar } from '@/components/appointments/AppointmentCalendar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -48,12 +50,22 @@ export default function Appointments() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [notes, setNotes] = useState('')
   const [conflict, setConflict] = useState<Appointment | null>(null)
+  const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', orgId],
     queryFn: () => AppointmentRepo.list(orgId!),
     enabled: !!orgId,
   })
+
+  const visibleAppointments = useMemo(
+    () =>
+      selectedDate
+        ? appointments.filter((appt) => appt.scheduled_at && isSameDay(new Date(appt.scheduled_at), selectedDate))
+        : appointments,
+    [appointments, selectedDate]
+  )
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -122,10 +134,34 @@ export default function Appointments() {
           </h1>
           <p className="mt-1 text-sm text-brand-text-secondary">Bookings scheduled through your chatbots.</p>
         </div>
-        <Button onClick={() => setFormOpen((v) => !v)} className="gap-1.5">
-          {formOpen ? <X className="size-4" /> : <Plus className="size-4" />}
-          {formOpen ? 'Cancel' : 'New appointment'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 rounded-lg border border-border p-0.5">
+            <Button
+              type="button"
+              variant={view === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setView('list')}
+            >
+              <List className="size-4" />
+              List
+            </Button>
+            <Button
+              type="button"
+              variant={view === 'calendar' ? 'default' : 'ghost'}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setView('calendar')}
+            >
+              <Calendar className="size-4" />
+              Calendar
+            </Button>
+          </div>
+          <Button onClick={() => setFormOpen((v) => !v)} className="gap-1.5">
+            {formOpen ? <X className="size-4" /> : <Plus className="size-4" />}
+            {formOpen ? 'Cancel' : 'New appointment'}
+          </Button>
+        </div>
       </div>
 
       {formOpen && (
@@ -196,6 +232,10 @@ export default function Appointments() {
         </Card>
       )}
 
+      {view === 'calendar' && (
+        <AppointmentCalendar appointments={appointments} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-24">
           <LoadingSpinner />
@@ -209,9 +249,13 @@ export default function Appointments() {
             No appointments yet. Bookings from your chatbots will show up here.
           </p>
         </div>
+      ) : visibleAppointments.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white py-16 text-center">
+          <p className="text-sm text-brand-text-secondary">No appointments on this day.</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {appointments.map((appt) => (
+          {visibleAppointments.map((appt) => (
             <AppointmentRow
               key={appt.id}
               appointment={appt}

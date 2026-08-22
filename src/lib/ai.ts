@@ -26,6 +26,8 @@ export interface WidgetChatbot {
   faqs: SuggestedQuestion[]
   fallback_message: string
   powered_by_branding: boolean
+  booking_url: string
+  accepts_appointments: boolean
 }
 
 export interface GetReplyOptions {

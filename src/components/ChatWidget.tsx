@@ -1,7 +1,19 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, ChevronRight, ExternalLink, HelpCircle, Home, MessageCircle, Send, Sparkles, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  HelpCircle,
+  Home,
+  MessageCircle,
+  Send,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { streamChatbotReply, type ChatTurn, type GetReplyFn, type WidgetChatbot } from '@/lib/ai'
+import { bookAppointment } from '@/lib/publicBooking'
 import type { SuggestedQuestion } from '@/entities'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/relativeTime'
@@ -13,7 +25,8 @@ export interface ChatWidgetMessage extends ChatTurn {
   created_date: string
 }
 
-type WidgetTab = 'home' | 'messages' | 'help'
+type WidgetTab = 'home' | 'messages' | 'help' | 'book'
+type BookingStatus = 'idle' | 'submitting' | 'success' | 'error'
 
 interface ChatWidgetProps {
   chatbot: WidgetChatbot
@@ -75,6 +88,13 @@ export function ChatWidget({
   const [isResponding, setIsResponding] = useState(false)
   const [streamingText, setStreamingText] = useState('')
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null)
+  const [bookName, setBookName] = useState('')
+  const [bookEmail, setBookEmail] = useState('')
+  const [bookPhone, setBookPhone] = useState('')
+  const [bookScheduledAt, setBookScheduledAt] = useState('')
+  const [bookNotes, setBookNotes] = useState('')
+  const [bookStatus, setBookStatus] = useState<BookingStatus>('idle')
+  const [bookError, setBookError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -203,6 +223,42 @@ export function ChatWidget({
     }
   }
 
+  async function handleBookAppointment(e: FormEvent) {
+    e.preventDefault()
+    if (!bookName.trim() || !bookEmail.trim() || !bookScheduledAt || bookStatus === 'submitting') return
+
+    setBookStatus('submitting')
+    setBookError('')
+
+    const result = await bookAppointment({
+      chatbotId: chatbot.id,
+      contactName: bookName.trim(),
+      contactEmail: bookEmail.trim(),
+      contactPhone: bookPhone.trim(),
+      scheduledAt: new Date(bookScheduledAt).toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      notes: bookNotes.trim(),
+    })
+
+    if (result.ok) {
+      setBookStatus('success')
+    } else {
+      setBookStatus('error')
+      setBookError(result.error)
+    }
+  }
+
+  function resetBookingForm() {
+    setBookName('')
+    setBookEmail('')
+    setBookPhone('')
+    setBookScheduledAt('')
+    setBookNotes('')
+    setBookStatus('idle')
+    setBookError('')
+    setTab('home')
+  }
+
   if (variant === 'embedded' && !open) {
     return (
       <button
@@ -271,7 +327,9 @@ export function ChatWidget({
       <div className="flex items-center gap-3 px-5 py-4 text-white" style={gradientStyle}>
         {avatar}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-tight">{tab === 'help' ? 'Help' : chatbot.name}</p>
+          <p className="truncate text-sm font-semibold leading-tight">
+            {tab === 'help' ? 'Help' : tab === 'book' ? 'Book an appointment' : chatbot.name}
+          </p>
           {tab === 'messages' && (
             <p className="flex items-center gap-1.5 text-xs text-white/80">
               <span className="size-1.5 rounded-full bg-emerald-400" />
@@ -318,6 +376,28 @@ export function ChatWidget({
               <p className="text-sm font-medium text-brand-navy">Send us a message</p>
             )}
           </button>
+
+          {chatbot.accepts_appointments && (
+            <button
+              onClick={() => setTab('book')}
+              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
+            >
+              Book an appointment
+              <ChevronRight className="size-4 shrink-0 text-brand-text-secondary" />
+            </button>
+          )}
+
+          {chatbot.booking_url && (
+            <a
+              href={chatbot.booking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex cursor-pointer items-center justify-between gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-sm font-medium text-brand-navy shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
+            >
+              Schedule externally
+              <ExternalLink className="size-4 shrink-0 text-brand-text-secondary" />
+            </a>
+          )}
 
           {chatbot.links.map((link) => (
             <a
@@ -371,6 +451,107 @@ export function ChatWidget({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {tab === 'book' && (
+        <div className="flex-1 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+          {bookStatus === 'success' ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center shadow-sm">
+              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <Check className="size-6" />
+              </div>
+              <p className="text-sm font-medium text-brand-navy">You're booked!</p>
+              <p className="text-sm text-brand-text-secondary">
+                {bookEmail
+                  ? "We'll send a confirmation to your email once it's reviewed."
+                  : 'The team will be in touch to confirm.'}
+              </p>
+              <button
+                onClick={resetBookingForm}
+                className="cursor-pointer rounded-full px-4 py-2 text-sm font-medium text-white transition-all hover:scale-105 active:scale-95"
+                style={{ backgroundColor: themeColor }}
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleBookAppointment} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="book-name" className="text-xs font-medium text-brand-text-secondary">
+                  Name
+                </label>
+                <input
+                  id="book-name"
+                  value={bookName}
+                  onChange={(e) => setBookName(e.target.value)}
+                  required
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="book-email" className="text-xs font-medium text-brand-text-secondary">
+                  Email
+                </label>
+                <input
+                  id="book-email"
+                  type="email"
+                  value={bookEmail}
+                  onChange={(e) => setBookEmail(e.target.value)}
+                  required
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="book-phone" className="text-xs font-medium text-brand-text-secondary">
+                  Phone (optional)
+                </label>
+                <input
+                  id="book-phone"
+                  type="tel"
+                  value={bookPhone}
+                  onChange={(e) => setBookPhone(e.target.value)}
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="book-datetime" className="text-xs font-medium text-brand-text-secondary">
+                  Preferred date &amp; time
+                </label>
+                <input
+                  id="book-datetime"
+                  type="datetime-local"
+                  value={bookScheduledAt}
+                  onChange={(e) => setBookScheduledAt(e.target.value)}
+                  required
+                  className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="book-notes" className="text-xs font-medium text-brand-text-secondary">
+                  What's this about? (optional)
+                </label>
+                <textarea
+                  id="book-notes"
+                  rows={3}
+                  value={bookNotes}
+                  onChange={(e) => setBookNotes(e.target.value)}
+                  className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-brand-navy outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+
+              {bookStatus === 'error' && <p className="text-sm text-destructive">{bookError}</p>}
+
+              <button
+                type="submit"
+                disabled={!bookName.trim() || !bookEmail.trim() || !bookScheduledAt || bookStatus === 'submitting'}
+                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all enabled:hover:scale-[1.02] enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ backgroundColor: themeColor }}
+              >
+                {bookStatus === 'submitting' ? 'Booking…' : 'Book appointment'}
+              </button>
+            </form>
+          )}
         </div>
       )}
 

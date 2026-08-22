@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SuggestedQuestionsEditor } from '../SuggestedQuestionsEditor'
@@ -31,6 +32,7 @@ interface SettingsForm {
   business_hours: string
   custom_prompt: string
   booking_url: string
+  accepts_appointments: boolean
 }
 
 interface BrandingForm {
@@ -55,6 +57,7 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
     business_hours: chatbot.business_hours,
     custom_prompt: chatbot.custom_prompt,
     booking_url: chatbot.booking_url,
+    accepts_appointments: chatbot.accepts_appointments,
   })
   const [justSaved, setJustSaved] = useState(false)
 
@@ -249,6 +252,20 @@ export function SettingsTab({ chatbot }: { chatbot: Chatbot }) {
               value={form.booking_url}
               onChange={(e) => update({ booking_url: e.target.value })}
               placeholder="https://cal.com/you"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+            <div>
+              <Label htmlFor="settings-accepts-appointments">Accept bookings in the chat widget</Label>
+              <p className="mt-0.5 text-sm text-brand-text-secondary">
+                Lets visitors book directly from a native form in the widget — separate from (and works alongside)
+                the booking URL above. New bookings appear as pending on your Appointments page for you to confirm.
+              </p>
+            </div>
+            <Switch
+              id="settings-accepts-appointments"
+              checked={form.accepts_appointments}
+              onCheckedChange={(checked) => update({ accepts_appointments: checked })}
             />
           </div>
         </CardContent>

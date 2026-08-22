@@ -12,6 +12,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
+import { buildAppointmentConfirmationEmail } from '../_shared/appointmentEmail.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -25,23 +26,6 @@ function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-  })
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;'
-      case '<':
-        return '&lt;'
-      case '>':
-        return '&gt;'
-      case '"':
-        return '&quot;'
-      default:
-        return '&#39;'
-    }
   })
 }
 
@@ -87,39 +71,14 @@ Deno.serve(async (req: Request) => {
     const { data: org } = await adminClient.from('orgs').select('name').eq('id', membership.org_id).maybeSingle()
     const orgName = org?.name || 'Nexiora AI'
 
-    const scheduledDate = appointment.scheduled_at ? new Date(appointment.scheduled_at) : null
-    const scheduledLabel = scheduledDate
-      ? scheduledDate.toLocaleString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          timeZoneName: 'short',
-        })
-      : 'To be confirmed'
-
-    const safeName = escapeHtml(appointment.contact_name || 'there')
-    const safeOrgName = escapeHtml(orgName)
-    const safeNotes = appointment.notes ? escapeHtml(appointment.notes) : ''
-
-    await sendEmail({
-      to: appointment.contact_email,
-      subject: `Your appointment with ${orgName} is confirmed`,
-      html: `
-        <div style="font-family: -apple-system, Segoe UI, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #1d4ed8;">Appointment confirmed</h2>
-          <p>Hi ${safeName},</p>
-          <p>Your appointment with <strong>${safeOrgName}</strong> is confirmed for:</p>
-          <p style="font-size: 16px; font-weight: 600; padding: 12px 16px; background: #eff6ff; border-radius: 8px;">
-            ${escapeHtml(scheduledLabel)}
-          </p>
-          ${safeNotes ? `<p><strong>Notes:</strong> ${safeNotes}</p>` : ''}
-          <p style="color: #64748b; font-size: 13px; margin-top: 24px;">Sent by ${safeOrgName} via Nexiora AI.</p>
-        </div>
-      `,
+    const { subject, html } = buildAppointmentConfirmationEmail({
+      contactName: appointment.contact_name,
+      orgName,
+      scheduledAt: appointment.scheduled_at,
+      notes: appointment.notes,
     })
+
+    await sendEmail({ to: appointment.contact_email, subject, html })
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
