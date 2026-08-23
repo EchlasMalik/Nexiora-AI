@@ -257,10 +257,15 @@ export default function Appointments() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[22rem_1fr] lg:items-start">
-          <AppointmentCalendar appointments={appointments} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+        <div className="grid gap-6 lg:h-[calc(100vh-14rem)] lg:grid-cols-2">
+          <AppointmentCalendar
+            appointments={appointments}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            className="h-96 lg:h-full"
+          />
 
-          <Card className="flex h-112 flex-col overflow-hidden">
+          <Card className="flex h-96 flex-col overflow-hidden lg:h-full">
             <CardContent className="flex h-full min-h-0 flex-1 flex-col gap-3">
               <div className="flex shrink-0 gap-1 rounded-lg border border-border p-0.5 self-start">
                 {APPOINTMENT_TABS.map((t) => (

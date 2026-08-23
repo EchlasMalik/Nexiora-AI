@@ -25,8 +25,8 @@ export function StatsRow({ stats }: { stats: Stat[] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: i * 0.05 }}
         >
-          <Card>
-            <CardContent className="flex flex-col gap-3">
+          <Card className="h-full">
+            <CardContent className="flex h-full flex-col gap-3">
               <div className={`flex size-11 items-center justify-center rounded-xl ${stat.iconBg} ${stat.iconColor}`}>
                 <stat.icon className="size-5" />
               </div>

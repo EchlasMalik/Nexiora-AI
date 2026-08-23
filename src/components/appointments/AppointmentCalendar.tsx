@@ -20,12 +20,13 @@ interface AppointmentCalendarProps {
   appointments: Appointment[]
   selectedDate: Date | null
   onSelectDate: (date: Date | null) => void
+  className?: string
 }
 
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 /** Month grid showing an appointment count per day — click a day to filter the list below it, click again to clear. */
-export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }: AppointmentCalendarProps) {
+export function AppointmentCalendar({ appointments, selectedDate, onSelectDate, className }: AppointmentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
 
   const countsByDay = useMemo(() => {
@@ -54,8 +55,8 @@ export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-4">
-      <div className="mb-4 flex items-center justify-between">
+    <div className={cn('flex flex-col rounded-2xl border border-border bg-white p-4', className)}>
+      <div className="mb-4 flex shrink-0 items-center justify-between">
         <p className="text-sm font-semibold text-brand-navy">{format(currentMonth, 'MMMM yyyy')}</p>
         <div className="flex items-center gap-1">
           <Button
@@ -82,7 +83,7 @@ export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-brand-text-secondary">
+      <div className="grid shrink-0 grid-cols-7 gap-1 text-center text-xs font-medium text-brand-text-secondary">
         {WEEKDAY_LABELS.map((label) => (
           <div key={label} className="py-1">
             {label}
@@ -90,7 +91,7 @@ export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="mt-1 grid flex-1 auto-rows-fr grid-cols-7 gap-1">
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd')
           const count = countsByDay.get(key) ?? 0
@@ -103,7 +104,7 @@ export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }
               type="button"
               onClick={() => handleDayClick(day)}
               className={cn(
-                'flex aspect-square cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg text-sm transition-colors',
+                'flex min-h-9 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg text-sm transition-colors',
                 inCurrentMonth ? 'text-brand-navy' : 'text-brand-text-secondary/40',
                 isSelected ? 'bg-violet-600 text-white' : 'hover:bg-slate-50',
                 isToday(day) && !isSelected && 'font-semibold text-violet-700'
