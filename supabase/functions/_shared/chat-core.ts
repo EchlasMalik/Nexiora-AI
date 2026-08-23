@@ -186,7 +186,30 @@ export interface AiUsage {
 // hang for ~30s and never return anything, not even an error — suspected
 // anti-abuse blocking of datacenter traffic on Google's end. Groq's free
 // tier + LPU hardware answers very fast.
-const GROQ_MODEL = 'llama-3.3-70b-versatile'
+//
+// Was 'llama-3.3-70b-versatile', which Groq has since removed from this
+// account's catalog entirely (confirmed via a live /v1/models query — no
+// Llama models remain at all). Verified this replacement directly against
+// the real key with the exact production request shape: ~0.5s for a full
+// streamed reply. It emits hidden reasoning on a separate `delta.reasoning`
+// field, which parseGroqStream below already ignores (only reads
+// `delta.content`), so no parsing changes were needed.
+const GROQ_MODEL = 'openai/gpt-oss-20b'
+// Tried in order after GROQ_MODEL if it errors — a larger model in the same
+// family, also verified directly against the real key. Groq has already
+// silently deprecated one model out from under us once (see above); trying
+// further independently-verified models before giving up on Groq entirely
+// means a single deprecation doesn't immediately drop back to the fallback
+// message for every visitor.
+const GROQ_FALLBACK_MODEL = 'openai/gpt-oss-120b'
+// Deliberately a different vendor/family from the two above (Groq's own
+// "compound" model, not an OpenAI OSS one) so a single vendor-side
+// deprecation can't take out all three at once. Verified directly: same
+// clean shape as the others (reasoning on its own `delta.reasoning` field,
+// `delta.content` holds only the final answer). Note `groq/compound`
+// (non-mini) was also tried and came back with empty content in testing —
+// deliberately not used here.
+const GROQ_SECOND_FALLBACK_MODEL = 'groq/compound-mini'
 
 interface StreamEvent {
   text?: string
@@ -371,35 +394,40 @@ export async function streamAiReply(
     return jsonError('AI provider error', 502)
   }
 
-  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      max_tokens: 1024,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...history.map((turn) => ({
-          role: turn.role === 'assistant' ? 'assistant' : 'user',
-          content: turn.content,
-        })),
-      ],
-      stream: true,
-      stream_options: { include_usage: true },
-    }),
-  }).catch((err) => {
-    console.error('Groq request failed', err)
-    return null
-  })
+  for (const model of [GROQ_MODEL, GROQ_FALLBACK_MODEL, GROQ_SECOND_FALLBACK_MODEL]) {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${groqApiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history.map((turn) => ({
+            role: turn.role === 'assistant' ? 'assistant' : 'user',
+            content: turn.content,
+          })),
+        ],
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    }).catch((err) => {
+      console.error(`Groq request failed (${model})`, err)
+      return null
+    })
 
-  if (!groqResponse?.ok || !groqResponse.body) {
-    const errText = await groqResponse?.text().catch(() => '')
-    console.error('Groq error', groqResponse?.status, errText)
-    return jsonError('AI provider error', 502)
+    if (groqResponse?.ok && groqResponse.body) {
+      return relayAsSse(parseGroqStream(groqResponse.body), 'groq', onComplete)
+    }
+
+    if (groqResponse) {
+      const errText = await groqResponse.text().catch(() => '')
+      console.error(`Groq error (${model}):`, groqResponse.status, errText)
+    }
   }
 
-  return relayAsSse(parseGroqStream(groqResponse.body), 'groq', onComplete)
+  return jsonError('AI provider error', 502)
 }

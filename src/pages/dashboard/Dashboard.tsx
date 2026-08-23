@@ -1,17 +1,27 @@
 import { useMemo } from 'react'
-import { useQueries } from '@tanstack/react-query'
-import { MessageSquare, Users, Calendar, TrendingUp } from 'lucide-react'
+import { useQueries, useQuery } from '@tanstack/react-query'
+import { startOfMonth } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { ChatbotRepo, ConversationRepo, ContactRepo, AppointmentRepo, type Conversation, type Contact } from '@/entities'
+import {
+  ChatbotRepo,
+  ConversationRepo,
+  ContactRepo,
+  AppointmentRepo,
+  type Conversation,
+  type Contact,
+} from '@/entities'
+import { getOrgSettings } from '@/lib/orgPreferences'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
-import { StatsRow, type Stat } from '@/components/dashboard/StatsRow'
+import { RoiSummary } from '@/components/dashboard/RoiSummary'
 import { ConversationsLeadsChart, type DayPoint } from '@/components/dashboard/ConversationsLeadsChart'
-import { TopQuestionsChart } from '@/components/dashboard/TopQuestionsChart'
 import { ChatbotsList } from '@/components/dashboard/ChatbotsList'
 import { RecentConversationsList } from '@/components/dashboard/RecentConversationsList'
+
+// Anything counted as actively worked, not just sitting untouched or dead.
+const QUALIFIED_LEAD_STATUSES = new Set(['qualified', 'contacted', 'won'])
 
 function buildLast7DaysSeries(conversations: Conversation[], contacts: Contact[]): DayPoint[] {
   const days: { key: string; label: string }[] = []
@@ -60,6 +70,12 @@ export default function Dashboard() {
     ],
   })
 
+  const { data: orgSettings } = useQuery({
+    queryKey: ['org-settings', orgId],
+    queryFn: () => getOrgSettings(orgId!),
+    enabled: !!orgId,
+  })
+
   const chatbots = chatbotsQuery.data ?? []
   const conversations = conversationsQuery.data ?? []
   const contacts = contactsQuery.data ?? []
@@ -71,40 +87,17 @@ export default function Dashboard() {
 
   const chartData = useMemo(() => buildLast7DaysSeries(conversations, contacts), [conversations, contacts])
 
-  const stats: Stat[] = [
-    {
-      label: 'Total Conversations',
-      value: String(conversations.length),
-      change: '+12% this week',
-      icon: MessageSquare,
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-600',
-    },
-    {
-      label: 'New Leads',
-      value: String(contacts.length),
-      change: '+8% this week',
-      icon: Users,
-      iconBg: 'bg-cyan-50',
-      iconColor: 'text-cyan-600',
-    },
-    {
-      label: 'Appointments',
-      value: String(appointments.length),
-      change: '+5% this week',
-      icon: Calendar,
-      iconBg: 'bg-sky-50',
-      iconColor: 'text-sky-600',
-    },
-    {
-      label: 'Conversion Rate',
-      value: '12.4%',
-      change: '+2.1pt this week',
-      icon: TrendingUp,
-      iconBg: 'bg-emerald-50',
-      iconColor: 'text-emerald-600',
-    },
-  ]
+  const roiStats = useMemo(() => {
+    const monthStart = startOfMonth(new Date()).toISOString()
+    const conversationsThisMonth = conversations.filter((c) => c.created_date >= monthStart).length
+    const qualifiedLeadsThisMonth = contacts.filter(
+      (c) => c.created_date >= monthStart && QUALIFIED_LEAD_STATUSES.has(c.status)
+    ).length
+    const appointmentsThisMonth = appointments.filter(
+      (a) => a.created_date >= monthStart && a.status !== 'cancelled'
+    ).length
+    return { conversationsThisMonth, qualifiedLeadsThisMonth, appointmentsThisMonth }
+  }, [conversations, contacts, appointments])
 
   return (
     <DashboardLayout>
@@ -119,14 +112,14 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="space-y-6">
-          <StatsRow stats={stats} />
+          <RoiSummary
+            conversations={roiStats.conversationsThisMonth}
+            qualifiedLeads={roiStats.qualifiedLeadsThisMonth}
+            appointments={roiStats.appointmentsThisMonth}
+            averageDealValue={orgSettings?.average_deal_value ?? 0}
+          />
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <ConversationsLeadsChart data={chartData} />
-            </div>
-            <TopQuestionsChart />
-          </div>
+          <ConversationsLeadsChart data={chartData} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <ChatbotsList chatbots={chatbots} />

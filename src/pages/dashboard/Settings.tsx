@@ -6,7 +6,7 @@ import { Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { defaultPreferences, getPreferences, savePreferences, type UserPreferences } from '@/lib/preferences'
-import { getOrgNotificationSettings, updateOrgNotificationSettings, type OrgNotificationSettings } from '@/lib/orgPreferences'
+import { getOrgSettings, updateOrgSettings, type OrgSettings } from '@/lib/orgPreferences'
 import { exportOrgData } from '@/lib/dataExport'
 import { fetchSubscription } from '@/lib/billing'
 import { supabase } from '@/lib/supabase'
@@ -39,7 +39,11 @@ const PLAN_LABELS: Record<string, { name: string; price: string }> = {
   enterprise: { name: 'Enterprise', price: 'Custom' },
 }
 
-const NOTIFICATIONS: { key: keyof Omit<OrgNotificationSettings, 'notification_email'>; label: string; description: string }[] = [
+const NOTIFICATIONS: {
+  key: keyof Omit<OrgSettings, 'notification_email' | 'average_deal_value'>
+  label: string
+  description: string
+}[] = [
   { key: 'notify_new_lead', label: 'New lead', description: 'A visitor is captured as a lead.' },
   { key: 'notify_appointment', label: 'Appointment', description: 'A new appointment is booked.' },
   {
@@ -61,7 +65,7 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState(user?.name ?? '')
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences)
-  const [orgNotifications, setOrgNotifications] = useState<OrgNotificationSettings | null>(null)
+  const [orgSettings, setOrgSettings] = useState<OrgSettings | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [deleteArmed, setDeleteArmed] = useState(false)
@@ -74,9 +78,9 @@ export default function Settings() {
     enabled: !!orgId,
   })
 
-  const { data: fetchedOrgNotifications } = useQuery({
-    queryKey: ['org-notification-settings', orgId],
-    queryFn: () => getOrgNotificationSettings(orgId!),
+  const { data: fetchedOrgSettings } = useQuery({
+    queryKey: ['org-settings', orgId],
+    queryFn: () => getOrgSettings(orgId!),
     enabled: !!orgId,
   })
 
@@ -85,16 +89,16 @@ export default function Settings() {
   }, [orgId])
 
   useEffect(() => {
-    if (fetchedOrgNotifications) setOrgNotifications(fetchedOrgNotifications)
-  }, [fetchedOrgNotifications])
+    if (fetchedOrgSettings) setOrgSettings(fetchedOrgSettings)
+  }, [fetchedOrgSettings])
 
   function updatePreference<K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) {
     setPreferences((prev) => ({ ...prev, [key]: value }))
     setJustSaved(false)
   }
 
-  function updateOrgNotification<K extends keyof OrgNotificationSettings>(key: K, value: OrgNotificationSettings[K]) {
-    setOrgNotifications((prev) => (prev ? { ...prev, [key]: value } : prev))
+  function updateOrgSetting<K extends keyof OrgSettings>(key: K, value: OrgSettings[K]) {
+    setOrgSettings((prev) => (prev ? { ...prev, [key]: value } : prev))
     setJustSaved(false)
   }
 
@@ -104,7 +108,7 @@ export default function Settings() {
     try {
       await updateProfile({ name: fullName.trim() })
       savePreferences(orgId, preferences)
-      if (orgNotifications) await updateOrgNotificationSettings(orgId, orgNotifications)
+      if (orgSettings) await updateOrgSettings(orgId, orgSettings)
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 2500)
     } catch (err) {
@@ -196,10 +200,10 @@ export default function Settings() {
                 <Input
                   id="notification-email"
                   type="email"
-                  value={orgNotifications?.notification_email ?? ''}
-                  onChange={(e) => updateOrgNotification('notification_email', e.target.value)}
+                  value={orgSettings?.notification_email ?? ''}
+                  onChange={(e) => updateOrgSetting('notification_email', e.target.value)}
                   placeholder={user?.email || 'you@example.com'}
-                  disabled={!orgNotifications}
+                  disabled={!orgSettings}
                 />
                 <p className="text-xs text-brand-text-secondary">
                   Leave blank to use your login email above.
@@ -208,9 +212,9 @@ export default function Settings() {
               {NOTIFICATIONS.map((item) => (
                 <label key={item.key} className="flex cursor-pointer items-start gap-3">
                   <Checkbox
-                    checked={orgNotifications ? orgNotifications[item.key] : false}
-                    onCheckedChange={(checked) => updateOrgNotification(item.key, checked === true)}
-                    disabled={!orgNotifications}
+                    checked={orgSettings ? orgSettings[item.key] : false}
+                    onCheckedChange={(checked) => updateOrgSetting(item.key, checked === true)}
+                    disabled={!orgSettings}
                     className="mt-0.5"
                   />
                   <div>
@@ -219,6 +223,32 @@ export default function Settings() {
                   </div>
                 </label>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Business metrics</CardTitle>
+              <CardDescription>Drives the dashboard's ROI estimates.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="average-deal-value">Average deal value (£)</Label>
+                <Input
+                  id="average-deal-value"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={orgSettings?.average_deal_value ?? 0}
+                  onChange={(e) => updateOrgSetting('average_deal_value', Number(e.target.value) || 0)}
+                  placeholder="e.g. 2000"
+                  disabled={!orgSettings}
+                />
+                <p className="text-xs text-brand-text-secondary">
+                  Roughly what a typical booked appointment is worth to your business. Your dashboard multiplies
+                  this by appointments booked each month to estimate pipeline value.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
