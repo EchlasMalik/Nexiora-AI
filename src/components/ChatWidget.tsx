@@ -38,6 +38,14 @@ const GREETING_DELAY_MS = 2000
 const GREETING_AUTO_HIDE_MS = 10000
 const GREETING_SESSION_KEY = 'nexiora:widget_greeting_shown'
 
+// While the widget is open, an operator can take over a conversation from
+// the dashboard inbox and reply directly — those rows land straight in the
+// `messages` table with no way to push them to this anonymous visitor tab.
+// Polling `getHistory` is the same low-effort read the "returning visitor"
+// restore already uses, just repeated, so an operator's reply shows up
+// without the visitor having to refresh the page.
+const HISTORY_POLL_MS = 5000
+
 interface ChatWidgetProps {
   chatbot: WidgetChatbot
   onClose?: () => void
@@ -147,11 +155,16 @@ export function ChatWidget({
     return () => clearTimeout(hideTimer)
   }, [showGreeting])
 
-  // Restores a returning visitor's prior conversation the first time they
-  // open the widget — fetched on open rather than on mount, so a visitor who
-  // never opens it never costs an extra request.
+  // Restores a returning visitor's prior conversation each time they open the
+  // widget (not on mount, so a visitor who never opens it never costs an
+  // extra request) — re-armed on close so reopening later picks up anything
+  // an operator sent while the widget was shut.
   useEffect(() => {
-    if (!open || !getHistory || historyFetchedRef.current) return
+    if (!open) {
+      historyFetchedRef.current = false
+      return
+    }
+    if (!getHistory || historyFetchedRef.current) return
     historyFetchedRef.current = true
     let cancelled = false
     getHistory(chatbot).then((history) => {
@@ -165,6 +178,25 @@ export function ChatWidget({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch once per open, guarded by historyFetchedRef
   }, [open])
+
+  // Keeps a conversation the visitor already has open in sync with an
+  // operator replying live from the dashboard inbox — merges in any message
+  // from the server that isn't already shown locally (matched by role +
+  // content, since a message sent from this tab has a client-generated id
+  // that never matches the row's real database id).
+  useEffect(() => {
+    if (!open || !getHistory) return
+    const interval = setInterval(async () => {
+      const history = await getHistory(chatbot)
+      if (history.length === 0) return
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => `${m.role}:${m.content}`))
+        const fresh = history.filter((m) => !known.has(`${m.role}:${m.content}`))
+        return fresh.length > 0 ? [...prev, ...fresh] : prev
+      })
+    }, HISTORY_POLL_MS)
+    return () => clearInterval(interval)
+  }, [open, getHistory, chatbot])
 
   function handleClose() {
     setOpen(false)
