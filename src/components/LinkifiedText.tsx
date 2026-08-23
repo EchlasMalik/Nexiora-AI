@@ -2,11 +2,22 @@ import { cn } from '@/lib/utils'
 
 const URL_PATTERN = /(https?:\/\/[^\s]+)/g
 
+// The model sometimes wraps a link in angle brackets (e.g. "<https://example.com>")
+// — a common convention for keeping trailing punctuation out of the URL.
+// `URL_PATTERN` doesn't treat `<`/`>` as delimiters, so the `>` would
+// otherwise get swallowed into the href (breaking it) while the leading `<`
+// is left behind as a stray visible character — strip the pair first so the
+// rest of the linkify logic below sees a clean bare URL.
+const ANGLE_WRAPPED_URL_PATTERN = /<(https?:\/\/[^\s<>]+)>/g
+
 // A reply often ends a sentence right after a URL with no space before the
 // punctuation (e.g. "book here: https://example.com.") — the greedy match
 // above would swallow that into the link itself and break it, so strip
 // trailing sentence punctuation off the match and render it as plain text.
-const TRAILING_PUNCTUATION_PATTERN = /[.,!?;:'"]+$/
+// `>` is included too, in case an angle-bracket-wrapped URL above was
+// unpaired (e.g. a leading `<` got cut off by history/streaming) and slipped
+// through as ordinary trailing punctuation instead.
+const TRAILING_PUNCTUATION_PATTERN = /[.,!?;:'">]+$/
 
 /**
  * Renders message text with paragraphs preserved and bare URLs turned into
@@ -20,7 +31,7 @@ const TRAILING_PUNCTUATION_PATTERN = /[.,!?;:'"]+$/
  * (stateful, /g-flagged) regex against each part.
  */
 export function LinkifiedText({ text, className }: { text: string; className?: string }) {
-  const parts = text.split(URL_PATTERN)
+  const parts = text.replace(ANGLE_WRAPPED_URL_PATTERN, '$1').split(URL_PATTERN)
   return (
     <span className={cn('whitespace-pre-line', className)}>
       {parts.map((part, i) => {

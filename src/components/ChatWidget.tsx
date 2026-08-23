@@ -481,7 +481,7 @@ export function ChatWidget({
     <div
       className={cn(
         'flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl',
-        variant === 'embedded' ? 'h-[600px] w-[380px]' : 'h-full w-full'
+        variant === 'embedded' ? 'h-[600px] w-[380px] max-w-[calc(100vw-2rem)]' : 'h-full w-full'
       )}
     >
       {header}
@@ -907,7 +907,7 @@ export function ChatWidget({
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-        className="fixed right-6 z-50 transition-[bottom] duration-300 ease-out"
+        className="fixed left-1/2 z-50 -translate-x-1/2 transition-[bottom] duration-300 ease-out sm:left-auto sm:right-6 sm:translate-x-0"
         style={{ bottom: bottomOffset }}
       >
         {widget}

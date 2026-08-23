@@ -132,6 +132,13 @@ export function buildSystemPrompt(chatbot: ChatbotRow, knowledgeText: string): s
       ? `Here are the most relevant excerpts from your knowledge base for the visitor's latest message. Answer from these if they cover it; if they don't, say so honestly rather than guessing:\n\n${knowledgeText}`
       : "No knowledge base excerpts matched this question (either none is configured yet, or nothing relevant was found) — answer helpfully from general knowledge and invite the visitor to leave their contact details for a follow-up.",
     'Keep replies concise and conversational — a few sentences, suited for a chat widget, not a long essay.',
+    // The widget renders plain text only (newlines are preserved, bare URLs
+    // become links — nothing else) — no Markdown parser. Left unconstrained,
+    // Claude tends to reach for tables and **bold** for anything list-like
+    // (e.g. summarizing services from a knowledge base excerpt), which then
+    // shows up to the visitor as literal pipes and asterisks instead of
+    // formatting.
+    "Never use Markdown formatting — no tables, no **bold**/*italic* asterisks, no # headings, no numbered or `-`/`*` bulleted lists. This chat widget only displays plain text, so any Markdown syntax would show up as literal stray characters instead of formatting. If you need to present multiple items (e.g. a list of services), write each on its own line as plain prose (a short phrase or 'Name — what it does'), separated by blank lines if grouping helps — never a table or Markdown list.",
     "Reply in the same language the visitor is writing in, even if this prompt is in English — don't ask which language to use, just match theirs. If a conversation mixes languages, follow the visitor's most recent message. Default to English only if their language is unclear (e.g. a single word or emoji).",
   ]
   return parts.filter(Boolean).join('\n\n')
