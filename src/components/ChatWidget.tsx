@@ -29,6 +29,15 @@ export interface ChatWidgetMessage extends ChatTurn {
 type WidgetTab = 'home' | 'messages' | 'help' | 'book' | 'lead'
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error'
 
+// Proactive nudge shown near the collapsed launcher a few seconds after a
+// visitor lands on the page — a short, fixed teaser distinct from
+// `welcome_message` (which can be long/specific and is meant to be read
+// inside the chat, not squeezed into a small floating bubble).
+const GREETING_TEXT = '👋 How can we help you?'
+const GREETING_DELAY_MS = 2000
+const GREETING_AUTO_HIDE_MS = 10000
+const GREETING_SESSION_KEY = 'nexiora:widget_greeting_shown'
+
 interface ChatWidgetProps {
   chatbot: WidgetChatbot
   onClose?: () => void
@@ -102,6 +111,7 @@ export function ChatWidget({
   const [leadMessage, setLeadMessage] = useState('')
   const [leadStatus, setLeadStatus] = useState<FormStatus>('idle')
   const [leadError, setLeadError] = useState('')
+  const [showGreeting, setShowGreeting] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -118,6 +128,24 @@ export function ChatWidget({
       if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
     }
   }, [])
+
+  // Proactive greeting bubble: once per browser tab session (not every page
+  // navigation on the same visit), a few seconds after landing — only for
+  // the real embedded widget, never the dashboard's Live Preview.
+  useEffect(() => {
+    if (variant !== 'embedded' || sessionStorage.getItem(GREETING_SESSION_KEY)) return
+    const showTimer = setTimeout(() => {
+      setShowGreeting(true)
+      sessionStorage.setItem(GREETING_SESSION_KEY, '1')
+    }, GREETING_DELAY_MS)
+    return () => clearTimeout(showTimer)
+  }, [variant])
+
+  useEffect(() => {
+    if (!showGreeting) return
+    const hideTimer = setTimeout(() => setShowGreeting(false), GREETING_AUTO_HIDE_MS)
+    return () => clearTimeout(hideTimer)
+  }, [showGreeting])
 
   // Restores a returning visitor's prior conversation the first time they
   // open the widget — fetched on open rather than on mount, so a visitor who
@@ -301,14 +329,44 @@ export function ChatWidget({
 
   if (variant === 'embedded' && !open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        aria-label={`Chat with ${chatbot.name}`}
-        className="fixed right-6 z-50 flex size-14 cursor-pointer items-center justify-center rounded-full text-white shadow-xl transition-[bottom,transform] duration-300 ease-out hover:scale-110 active:scale-95"
-        style={{ backgroundColor: themeColor, bottom: bottomOffset }}
+      <div
+        className="fixed right-6 z-50 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-out"
+        style={{ bottom: bottomOffset }}
       >
-        <MessageCircle className="size-6" />
-      </button>
+        <AnimatePresence>
+          {showGreeting && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpen(true)}
+              className="relative max-w-[220px] cursor-pointer rounded-2xl bg-white py-3 pr-8 pl-4 text-sm font-medium text-brand-navy shadow-xl"
+            >
+              {GREETING_TEXT}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowGreeting(false)
+                }}
+                aria-label="Dismiss"
+                className="absolute right-1.5 top-1.5 flex size-5 cursor-pointer items-center justify-center rounded-full text-brand-text-secondary hover:bg-slate-100"
+              >
+                <X className="size-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
+          onClick={() => setOpen(true)}
+          aria-label={`Chat with ${chatbot.name}`}
+          className="flex size-14 cursor-pointer items-center justify-center rounded-full text-white shadow-xl transition-transform duration-300 ease-out hover:scale-110 active:scale-95"
+          style={{ backgroundColor: themeColor }}
+        >
+          <MessageCircle className="size-6" />
+        </button>
+      </div>
     )
   }
 
