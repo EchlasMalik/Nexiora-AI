@@ -297,27 +297,25 @@ export default function Settings() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <Card className="overflow-hidden border-0">
-            <div className="bg-linear-to-r from-violet-600 to-violet-800 p-6 text-white">
-              <p className="text-sm text-violet-100">Current plan</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {subscription?.status === 'active' || subscription?.status === 'trialing'
-                  ? (PLAN_LABELS[subscription.plan]?.name ?? subscription.plan)
-                  : 'No active plan'}
-              </p>
-              <p className="text-sm text-violet-100">
-                {subscription?.status === 'active' || subscription?.status === 'trialing'
-                  ? (PLAN_LABELS[subscription.plan]?.price ?? '')
-                  : 'Choose a plan to get started'}
-              </p>
-              <Button
-                onClick={() => navigate('/dashboard/billing')}
-                className="mt-4 w-full justify-center bg-none bg-white text-violet-700 hover:bg-slate-100"
-              >
-                Manage plan
-              </Button>
-            </div>
-          </Card>
+          <div className="rounded-2xl bg-linear-to-r from-violet-600 to-violet-800 p-6 text-white shadow-sm">
+            <p className="text-sm text-violet-100">Current plan</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {subscription?.status === 'active' || subscription?.status === 'trialing'
+                ? (PLAN_LABELS[subscription.plan]?.name ?? subscription.plan)
+                : 'No active plan'}
+            </p>
+            <p className="text-sm text-violet-100">
+              {subscription?.status === 'active' || subscription?.status === 'trialing'
+                ? (PLAN_LABELS[subscription.plan]?.price ?? '')
+                : 'Choose a plan to get started'}
+            </p>
+            <Button
+              onClick={() => navigate('/dashboard/billing')}
+              className="mt-4 w-full justify-center bg-none bg-white text-violet-700 hover:bg-slate-100"
+            >
+              Manage plan
+            </Button>
+          </div>
 
           <Card>
             <CardHeader>
