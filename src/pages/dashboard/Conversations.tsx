@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Headset, Search, Send } from 'lucide-react'
+import { ArrowLeft, Headset, Search, Send } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
 import { ChatbotRepo, ConversationRepo, MessageRepo } from '@/entities'
 import { supabase } from '@/lib/supabase'
@@ -51,8 +51,13 @@ export default function Conversations() {
     return map
   }, [chatbots])
 
+  // On mobile, only one pane (list or messages) shows at a time, so
+  // auto-opening the first conversation would skip straight past the list —
+  // this only runs at desktop widths (matches the `lg:` breakpoint the two
+  // panes themselves use below), where both panes are visible together.
   useEffect(() => {
-    if (!selectedId && conversations.length > 0) {
+    if (selectedId || conversations.length === 0) return
+    if (window.matchMedia('(min-width: 1024px)').matches) {
       setSelectedId(conversations[0].id)
     }
   }, [conversations, selectedId])
@@ -161,7 +166,12 @@ export default function Conversations() {
         </div>
       ) : (
         <div className="flex h-[calc(100vh-12rem)] gap-4">
-          <div className="flex w-full max-w-xs shrink-0 flex-col rounded-2xl border border-border bg-white">
+          <div
+            className={cn(
+              'w-full shrink-0 flex-col rounded-2xl border border-border bg-white lg:flex lg:max-w-xs',
+              selectedId ? 'hidden' : 'flex'
+            )}
+          >
             <div className="border-b border-border p-3">
               <div className="relative">
                 <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-brand-text-secondary" />
@@ -212,7 +222,12 @@ export default function Conversations() {
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col rounded-2xl border border-border bg-white">
+          <div
+            className={cn(
+              'flex-1 flex-col rounded-2xl border border-border bg-white lg:flex',
+              selectedId ? 'flex' : 'hidden lg:flex'
+            )}
+          >
             {!selectedConversation ? (
               <div className="flex flex-1 items-center justify-center text-sm text-brand-text-secondary">
                 Select a conversation to view messages.
@@ -220,17 +235,26 @@ export default function Conversations() {
             ) : (
               <>
                 <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
-                  <div>
-                    <p className="font-semibold text-brand-navy">
-                      {selectedConversation.visitor_name || 'Anonymous visitor'}
-                    </p>
-                    <p className="text-sm text-brand-text-secondary">
-                      {selectedConversation.status === 'human'
-                        ? '👤 Managed by you'
-                        : selectedConversation.status === 'closed'
-                          ? 'Closed'
-                          : '🤖 Managed by AI'}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <button
+                      onClick={() => setSelectedId(null)}
+                      aria-label="Back to conversations"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-brand-text-secondary hover:bg-slate-100 lg:hidden"
+                    >
+                      <ArrowLeft className="size-4" />
+                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-brand-navy">
+                        {selectedConversation.visitor_name || 'Anonymous visitor'}
+                      </p>
+                      <p className="text-sm text-brand-text-secondary">
+                        {selectedConversation.status === 'human'
+                          ? '👤 Managed by you'
+                          : selectedConversation.status === 'closed'
+                            ? 'Closed'
+                            : '🤖 Managed by AI'}
+                      </p>
+                    </div>
                   </div>
                   {selectedConversation.status === 'human' && (
                     <Button

@@ -71,22 +71,22 @@ export default function ChatbotDetail() {
           </div>
 
           <Tabs defaultValue="embed">
-            <TabsList>
+            <TabsList className="w-full sm:w-fit">
               <TabsTrigger value="embed" className="gap-1.5">
                 <Code2 className="size-4" />
-                Embed
+                <span className="hidden sm:inline">Embed</span>
               </TabsTrigger>
               <TabsTrigger value="preview" className="gap-1.5">
                 <ExternalLink className="size-4" />
-                Live Preview
+                <span className="hidden sm:inline">Live Preview</span>
               </TabsTrigger>
               <TabsTrigger value="knowledge" className="gap-1.5">
                 <BookOpen className="size-4" />
-                Knowledge Base
+                <span className="hidden sm:inline">Knowledge Base</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-1.5">
                 <SettingsIcon className="size-4" />
-                Settings
+                <span className="hidden sm:inline">Settings</span>
               </TabsTrigger>
             </TabsList>
 

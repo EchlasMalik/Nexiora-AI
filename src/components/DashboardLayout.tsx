@@ -143,7 +143,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close menu"
-                  className="flex size-8 items-center justify-center rounded-lg text-brand-text-secondary hover:bg-slate-100"
+                  className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-brand-navy active:bg-slate-200"
                 >
                   <X className="size-4" />
                 </button>
