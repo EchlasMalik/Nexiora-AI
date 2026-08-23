@@ -19,13 +19,17 @@ const steps = [
   },
 ]
 
-const codeSnippet = `<script
-  src="https://cdn.nexiora.ai/widget.js"
+export function HowItWorks() {
+  // Matches the real embed snippet shown in the dashboard (EmbedTab.tsx),
+  // which also derives from window.location.origin — so this marketing
+  // example always shows a real, working URL regardless of which domain the
+  // app is served from, rather than a hardcoded placeholder.
+  const codeSnippet = `<script
+  src="${window.location.origin}/widget.js"
   data-chatbot-id="your-chatbot-id"
   async
 ></script>`
 
-export function HowItWorks() {
   return (
     <section id="how-it-works" className="scroll-mt-20 bg-slate-50 py-24">
       <div className="mx-auto max-w-6xl px-6">

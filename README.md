@@ -123,8 +123,11 @@ npx supabase secrets set \
   STRIPE_PRICE_STARTER=price_... \
   STRIPE_PRICE_GROWTH=price_... \
   STRIPE_PRICE_BUSINESS=price_... \
-  RESEND_API_KEY=re_...
+  RESEND_API_KEY=re_... \
+  SITE_URL=https://your-domain.com
 ```
+
+`SITE_URL` is the public app domain — used to build the "activate your plan" link shown to a chatbot owner when their plan isn't active (see `billingFallbackMessage` in `supabase/functions/_shared/chat-core.ts`). Update this secret (and redeploy `chat-completion`/`public-chat`) any time the domain changes.
 
 `GROQ_API_KEY` is optional but recommended: `chat-completion` and `public-chat` both try Claude first and only fall back to Groq's free-tier `llama-3.3-70b-versatile` model if the Anthropic call errors (out of credits, rate limited, etc). Gemini was tried first but dropped — its free tier silently hangs when called from Supabase's own cloud IP range instead of returning an error. See `streamAiReply` in `supabase/functions/_shared/chat-core.ts`.
 

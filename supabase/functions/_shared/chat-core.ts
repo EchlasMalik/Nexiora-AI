@@ -46,8 +46,9 @@ export function jsonError(message: string, status: number): Response {
 }
 
 // Public marketing site URL, used only to build the "go activate a plan"
-// link below — override with a Supabase secret once a custom domain is set.
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://nexiora-ai-agent.vercel.app'
+// link below — the `SITE_URL` Supabase secret is the real source of truth;
+// this fallback only matters if that secret is ever unset.
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://nexiora-ai.app'
 
 export const GENERIC_FALLBACK_MESSAGE =
   "Sorry, I'm having trouble responding right now. Please try again in a moment."
