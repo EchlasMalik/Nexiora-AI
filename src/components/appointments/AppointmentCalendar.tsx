@@ -54,7 +54,7 @@ export function AppointmentCalendar({ appointments, selectedDate, onSelectDate }
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-border bg-white p-4">
+    <div className="rounded-2xl border border-border bg-white p-4">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-brand-navy">{format(currentMonth, 'MMMM yyyy')}</p>
         <div className="flex items-center gap-1">

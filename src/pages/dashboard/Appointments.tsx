@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { isSameDay } from 'date-fns'
-import { AlertTriangle, Calendar, Check, CheckCheck, Clock, List, Plus, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Check, CheckCheck, Clock, Plus, X } from 'lucide-react'
 import { useOrg } from '@/contexts/OrgContext'
 import { AppointmentRepo, type Appointment, type AppointmentStatus } from '@/entities'
 import { sendAppointmentConfirmation } from '@/lib/email'
@@ -41,6 +41,20 @@ function formatTime(scheduledAt: string) {
   return date.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 }
 
+type AppointmentTab = 'booked' | 'pending' | 'cancelled'
+
+const APPOINTMENT_TABS: { key: AppointmentTab; label: string }[] = [
+  { key: 'booked', label: 'Booked' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'cancelled', label: 'Cancelled' },
+]
+
+function matchesTab(appointment: Appointment, tab: AppointmentTab): boolean {
+  if (tab === 'booked') return appointment.status === 'confirmed' || appointment.status === 'completed'
+  if (tab === 'pending') return appointment.status === 'pending'
+  return appointment.status === 'cancelled'
+}
+
 export default function Appointments() {
   const { orgId } = useOrg()
   const queryClient = useQueryClient()
@@ -50,8 +64,8 @@ export default function Appointments() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [notes, setNotes] = useState('')
   const [conflict, setConflict] = useState<Appointment | null>(null)
-  const [view, setView] = useState<'list' | 'calendar'>('list')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [activeTab, setActiveTab] = useState<AppointmentTab>('booked')
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', orgId],
@@ -59,12 +73,24 @@ export default function Appointments() {
     enabled: !!orgId,
   })
 
+  const sortedAppointments = useMemo(
+    () =>
+      [...appointments].sort((a, b) => {
+        if (!a.scheduled_at) return 1
+        if (!b.scheduled_at) return -1
+        return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+      }),
+    [appointments]
+  )
+
   const visibleAppointments = useMemo(
     () =>
-      selectedDate
-        ? appointments.filter((appt) => appt.scheduled_at && isSameDay(new Date(appt.scheduled_at), selectedDate))
-        : appointments,
-    [appointments, selectedDate]
+      sortedAppointments.filter(
+        (appt) =>
+          matchesTab(appt, activeTab) &&
+          (!selectedDate || (appt.scheduled_at && isSameDay(new Date(appt.scheduled_at), selectedDate)))
+      ),
+    [sortedAppointments, activeTab, selectedDate]
   )
 
   const createMutation = useMutation({
@@ -143,34 +169,10 @@ export default function Appointments() {
           </h1>
           <p className="mt-1 text-sm text-brand-text-secondary">Bookings scheduled through your chatbots.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 rounded-lg border border-border p-0.5">
-            <Button
-              type="button"
-              variant={view === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setView('list')}
-            >
-              <List className="size-4" />
-              List
-            </Button>
-            <Button
-              type="button"
-              variant={view === 'calendar' ? 'default' : 'ghost'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setView('calendar')}
-            >
-              <Calendar className="size-4" />
-              Calendar
-            </Button>
-          </div>
-          <Button onClick={() => setFormOpen((v) => !v)} className="gap-1.5">
-            {formOpen ? <X className="size-4" /> : <Plus className="size-4" />}
-            {formOpen ? 'Cancel' : 'New appointment'}
-          </Button>
-        </div>
+        <Button onClick={() => setFormOpen((v) => !v)} className="gap-1.5">
+          {formOpen ? <X className="size-4" /> : <Plus className="size-4" />}
+          {formOpen ? 'Cancel' : 'New appointment'}
+        </Button>
       </div>
 
       {formOpen && (
@@ -241,10 +243,6 @@ export default function Appointments() {
         </Card>
       )}
 
-      {view === 'calendar' && (
-        <AppointmentCalendar appointments={appointments} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-      )}
-
       {isLoading ? (
         <div className="flex justify-center py-24">
           <LoadingSpinner />
@@ -258,29 +256,55 @@ export default function Appointments() {
             No appointments yet. Bookings from your chatbots will show up here.
           </p>
         </div>
-      ) : visibleAppointments.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white py-16 text-center">
-          <p className="text-sm text-brand-text-secondary">No appointments on this day.</p>
-        </div>
       ) : (
-        <div className="space-y-3">
-          {visibleAppointments.map((appt) => (
-            <AppointmentRow
-              key={appt.id}
-              appointment={appt}
-              onStatusChange={(status) => {
-                if (status === 'confirmed' && appt.scheduled_at) {
-                  const found = findConflict(appointments, appt.scheduled_at, appt.id)
-                  if (found) {
-                    toast.warning(
-                      `Heads up — this overlaps with your appointment with ${found.contact_name || 'another contact'} around the same time.`
-                    )
-                  }
-                }
-                updateStatusMutation.mutate({ id: appt.id, status })
-              }}
-            />
-          ))}
+        <div className="grid gap-6 lg:grid-cols-[22rem_1fr] lg:items-start">
+          <AppointmentCalendar appointments={appointments} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+
+          <Card className="flex h-112 flex-col overflow-hidden">
+            <CardContent className="flex h-full min-h-0 flex-1 flex-col gap-3">
+              <div className="flex shrink-0 gap-1 rounded-lg border border-border p-0.5 self-start">
+                {APPOINTMENT_TABS.map((t) => (
+                  <Button
+                    key={t.key}
+                    type="button"
+                    variant={activeTab === t.key ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setActiveTab(t.key)}
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                {visibleAppointments.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                    <p className="text-sm text-brand-text-secondary">
+                      {selectedDate ? 'No matching appointments on this day.' : 'Nothing here yet.'}
+                    </p>
+                  </div>
+                ) : (
+                  visibleAppointments.map((appt) => (
+                    <AppointmentRow
+                      key={appt.id}
+                      appointment={appt}
+                      onStatusChange={(status) => {
+                        if (status === 'confirmed' && appt.scheduled_at) {
+                          const found = findConflict(appointments, appt.scheduled_at, appt.id)
+                          if (found) {
+                            toast.warning(
+                              `Heads up — this overlaps with your appointment with ${found.contact_name || 'another contact'} around the same time.`
+                            )
+                          }
+                        }
+                        updateStatusMutation.mutate({ id: appt.id, status })
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </DashboardLayout>
