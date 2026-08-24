@@ -875,12 +875,6 @@ export function ChatWidget({
         </>
       )}
 
-      {chatbot.powered_by_branding && (
-        <p className="border-t border-border bg-white py-1.5 text-center text-[10px] text-brand-text-secondary">
-          Powered by Nexiora AI
-        </p>
-      )}
-
       <div className="flex border-t border-border bg-white">
         {navItems.map((item) => {
           const Icon = item.icon
@@ -898,6 +892,20 @@ export function ChatWidget({
           )
         })}
       </div>
+
+      {chatbot.powered_by_branding && (
+        <p className="border-t border-border bg-white py-1.5 text-center text-[10px] text-brand-text-secondary">
+          Powered by{' '}
+          <a
+            href="https://nexiora-ai.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium hover:text-brand-navy hover:underline"
+          >
+            Nexiora AI
+          </a>
+        </p>
+      )}
     </div>
   )
 
