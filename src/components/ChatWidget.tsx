@@ -362,7 +362,7 @@ export function ChatWidget({
   if (variant === 'embedded' && !open) {
     return (
       <div
-        className="fixed right-6 z-50 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-out"
+        className="fixed right-6 z-50 flex flex-col items-end gap-3 nexiora-widget-launcher-wrap"
         style={{ bottom: bottomOffset }}
       >
         <AnimatePresence>
@@ -373,7 +373,7 @@ export function ChatWidget({
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               onClick={() => setOpen(true)}
-              className="relative max-w-[220px] cursor-pointer rounded-2xl bg-white py-3 pr-8 pl-4 text-sm font-medium text-brand-navy shadow-xl"
+              className="nexiora-widget-greeting relative cursor-pointer rounded-2xl bg-white py-3 pr-8 pl-4 text-sm font-medium text-brand-navy shadow-xl"
             >
               {GREETING_TEXT}
               <button
@@ -481,13 +481,13 @@ export function ChatWidget({
     <div
       className={cn(
         'flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl',
-        variant === 'embedded' ? 'h-[600px] w-[380px] max-w-[calc(100vw-2rem)]' : 'h-full w-full'
+        variant === 'embedded' ? 'nexiora-widget-panel' : 'h-full w-full'
       )}
     >
       {header}
 
       {tab === 'home' && (
-        <div className="flex-1 space-y-3 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+        <div className="flex-1 space-y-3 overflow-y-auto nexiora-widget-tab-bg px-4 py-4">
           <button
             onClick={() => setTab('messages')}
             className="w-full cursor-pointer rounded-2xl border border-border bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:translate-y-0 active:shadow-sm"
@@ -571,7 +571,7 @@ export function ChatWidget({
       )}
 
       {tab === 'help' && (
-        <div className="flex-1 space-y-2 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+        <div className="flex-1 space-y-2 overflow-y-auto nexiora-widget-tab-bg px-4 py-4">
           {chatbot.faqs.map((faq, index) => {
             const isExpanded = expandedFaqIndex === index
             return (
@@ -601,7 +601,7 @@ export function ChatWidget({
       )}
 
       {tab === 'book' && (
-        <div className="flex-1 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+        <div className="flex-1 overflow-y-auto nexiora-widget-tab-bg px-4 py-4">
           {bookStatus === 'success' ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center shadow-sm">
               <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
@@ -691,7 +691,7 @@ export function ChatWidget({
               <button
                 type="submit"
                 disabled={!bookName.trim() || !bookEmail.trim() || !bookScheduledAt || bookStatus === 'submitting'}
-                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all enabled:hover:scale-[1.02] enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all nexiora-widget-btn-scale enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ backgroundColor: themeColor }}
               >
                 {bookStatus === 'submitting' ? 'Booking…' : 'Book appointment'}
@@ -702,7 +702,7 @@ export function ChatWidget({
       )}
 
       {tab === 'lead' && (
-        <div className="flex-1 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+        <div className="flex-1 overflow-y-auto nexiora-widget-tab-bg px-4 py-4">
           {leadStatus === 'success' ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center shadow-sm">
               <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
@@ -775,7 +775,7 @@ export function ChatWidget({
               <button
                 type="submit"
                 disabled={!leadName.trim() || (!leadEmail.trim() && !leadPhone.trim()) || leadStatus === 'submitting'}
-                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all enabled:hover:scale-[1.02] enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                className="cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium text-white transition-all nexiora-widget-btn-scale enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ backgroundColor: themeColor }}
               >
                 {leadStatus === 'submitting' ? 'Sending…' : 'Send'}
@@ -787,7 +787,7 @@ export function ChatWidget({
 
       {tab === 'messages' && (
         <>
-          <div className="flex-1 space-y-3 overflow-y-auto bg-[#faf9fc] px-4 py-4">
+          <div className="flex-1 space-y-3 overflow-y-auto nexiora-widget-tab-bg px-4 py-4">
             <AnimatePresence initial={false}>
               {messages.map((message) => (
                 <motion.div
@@ -796,7 +796,7 @@ export function ChatWidget({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25 }}
                   className={cn(
-                    'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm',
+                    'nexiora-widget-bubble-max rounded-2xl px-4 py-2.5 text-sm',
                     message.role === 'user'
                       ? 'ml-auto rounded-br-md text-white'
                       : 'rounded-bl-md bg-white text-brand-navy shadow-sm'
@@ -831,7 +831,7 @@ export function ChatWidget({
                   key="streaming"
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="max-w-[80%] rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-sm text-brand-navy shadow-sm"
+                  className="nexiora-widget-bubble-max rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-sm text-brand-navy shadow-sm"
                 >
                   <LinkifiedText text={streamingText} />
                 </motion.div>
@@ -894,7 +894,7 @@ export function ChatWidget({
       </div>
 
       {chatbot.powered_by_branding && (
-        <p className="border-t border-border bg-white py-1.5 text-center text-[10px] text-brand-text-secondary">
+        <p className="border-t border-border bg-white py-1.5 text-center nexiora-widget-text-10 text-brand-text-secondary">
           Powered by{' '}
           <a
             href="https://nexiora-ai.app"
@@ -915,7 +915,7 @@ export function ChatWidget({
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-        className="fixed left-1/2 z-50 -translate-x-1/2 transition-[bottom] duration-300 ease-out sm:left-auto sm:right-6 sm:translate-x-0"
+        className="nexiora-widget-panel-wrap"
         style={{ bottom: bottomOffset }}
       >
         {widget}
