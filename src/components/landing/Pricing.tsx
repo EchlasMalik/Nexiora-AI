@@ -4,62 +4,7 @@ import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-
-const plans = [
-  {
-    name: 'Starter',
-    price: '£39',
-    period: '/mo',
-    description: 'For solo founders getting their first chatbot live.',
-    features: ['1 chatbot', '500 conversations/mo', 'Email support', 'Basic analytics'],
-    cta: 'Start free trial',
-    highlighted: false,
-  },
-  {
-    name: 'Growth',
-    price: '£79',
-    period: '/mo',
-    description: 'For growing teams that live and die by their pipeline.',
-    features: [
-      '3 chatbots',
-      '2,500 conversations/mo',
-      'Lead capture & booking',
-      'Priority support',
-      'Advanced analytics',
-    ],
-    cta: 'Start free trial',
-    highlighted: true,
-  },
-  {
-    name: 'Business',
-    price: '£199',
-    period: '/mo',
-    description: 'For teams that need human handoff and custom branding.',
-    features: [
-      '10 chatbots',
-      '10,000 conversations/mo',
-      'Human handoff',
-      'Remove Nexiora branding',
-      'Dedicated support',
-    ],
-    cta: 'Start free trial',
-    highlighted: false,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    description: 'For organizations with custom integration and SLA needs.',
-    features: [
-      'Unlimited chatbots',
-      'Custom integrations',
-      'SLA & onboarding',
-      'Dedicated account manager',
-    ],
-    cta: 'Talk to staff',
-    highlighted: false,
-  },
-]
+import { plans } from '@/content/pricingPlans'
 
 export function Pricing() {
   return (

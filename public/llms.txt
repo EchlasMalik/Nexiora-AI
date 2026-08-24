@@ -1,0 +1,24 @@
+# Nexiora AI
+
+> Nexiora AI is an AI chatbot platform for businesses: it answers website visitor questions, qualifies leads, captures contact details, and books appointments — trained on each business's own content.
+
+Nexiora AI is built for small and medium businesses, agencies, consultants, and service businesses that want to convert website traffic into qualified leads and booked appointments without manual follow-up. Each chatbot is trained only on the business's own documents, FAQs, and website content, and answers only from what it has been given rather than guessing.
+
+## Product
+
+- [Homepage](https://nexiora-ai.app/): Product overview, features, pricing, and FAQ.
+- [Pricing](https://nexiora-ai.app/#pricing): Starter, Growth, Business, and Enterprise plans.
+- [FAQ](https://nexiora-ai.app/#faq): Common questions about setup, training, and billing.
+
+## Key features
+
+- 24/7 AI conversations trained on the business's own content
+- Automatic lead capture (name, email, requirements)
+- In-widget appointment booking
+- Knowledge base training from documents, FAQs, and website content
+- Human handoff for conversations the AI can't resolve
+- Conversation and lead analytics per chatbot
+
+## Setup
+
+A business creates a chatbot, trains it on their own content, and embeds a single script tag on their site — no coding required beyond that.

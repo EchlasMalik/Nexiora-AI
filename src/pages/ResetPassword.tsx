@@ -7,8 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Logo } from '@/components/Logo'
+import { useDocumentHead } from '@/lib/seo/useDocumentHead'
 
 export default function ResetPassword() {
+  useDocumentHead({
+    title: 'Set a new password',
+    description: 'Choose a new password for your Nexiora AI account.',
+    path: '/reset-password',
+    noindex: true,
+  })
+
   const { resetPassword } = useAuth()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')

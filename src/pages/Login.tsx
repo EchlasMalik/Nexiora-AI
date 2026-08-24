@@ -7,8 +7,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Logo } from '@/components/Logo'
+import { useDocumentHead } from '@/lib/seo/useDocumentHead'
 
 export default function Login() {
+  useDocumentHead({ title: 'Sign in', description: 'Sign in to your Nexiora AI dashboard.', path: '/login', noindex: true })
+
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()

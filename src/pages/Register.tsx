@@ -7,8 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Logo } from '@/components/Logo'
+import { useDocumentHead } from '@/lib/seo/useDocumentHead'
 
 export default function Register() {
+  useDocumentHead({
+    title: 'Create your account',
+    description: 'Start your free Nexiora AI trial.',
+    path: '/register',
+    noindex: true,
+  })
+
   const { register } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')

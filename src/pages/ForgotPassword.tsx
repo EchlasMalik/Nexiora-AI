@@ -7,8 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Logo } from '@/components/Logo'
+import { useDocumentHead } from '@/lib/seo/useDocumentHead'
 
 export default function ForgotPassword() {
+  useDocumentHead({
+    title: 'Reset your password',
+    description: 'Request a password reset link for your Nexiora AI account.',
+    path: '/forgot-password',
+    noindex: true,
+  })
+
   const { forgotPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
