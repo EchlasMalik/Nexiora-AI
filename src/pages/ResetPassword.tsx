@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Logo } from '@/components/Logo'
+import { AuthBackdrop } from '@/components/AuthBackdrop'
 import { useDocumentHead } from '@/lib/seo/useDocumentHead'
 
 export default function ResetPassword() {
@@ -39,8 +40,9 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-light-bg px-4">
-      <Card className="w-full max-w-sm">
+    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-brand-light-bg px-4">
+      <AuthBackdrop />
+      <Card className="animate-enter w-full max-w-sm shadow-xl shadow-slate-900/5 hover:border-border hover:shadow-xl">
         <CardHeader className="items-center text-center">
           <Link to="/" className="mb-2">
             <Logo />

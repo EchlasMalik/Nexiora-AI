@@ -6,6 +6,11 @@
 :root {
   --radius: 1rem;
 
+  /* Motion curves for hand-written CSS (mirrored as Tailwind ease-* in @theme). */
+  --motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --motion-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
   /* Nexiora AI brand palette */
   --brand-violet: #7c3aed;
   --brand-violet-secondary: #6d28d9;
@@ -106,6 +111,30 @@
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-logo: "Space Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+
+  /* Motion tokens — strong custom curves; the CSS built-ins are too weak. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-enter: enter 600ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  --animate-marquee: marquee 40s linear infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+      filter: blur(4px);
+    }
+  }
+
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
 
 @layer base {
@@ -120,10 +149,73 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+  }
+
+  ::selection {
+    background: rgb(124 58 237 / 0.18);
+  }
+}
+
+/* Movement is dropped for reduced-motion users; fades stay because they
+   still help comprehension. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-enter {
+    animation-name: fade-in;
+  }
+
+  .animate-marquee {
+    animation: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @layer utilities {
   .btn-gradient {
-    @apply bg-gradient-to-r from-violet-600 to-violet-800 text-white transition-all duration-200 hover:from-violet-500 hover:to-violet-700;
+    @apply bg-gradient-to-r from-violet-600 to-violet-800 text-white transition-[color,background-color,transform] duration-200 hover:from-violet-500 hover:to-violet-700;
+  }
+
+  /* Faint grid that fades out toward the edges — used behind hero/auth/CTA. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(15 23 42 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(15 23 42 / 0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 75%);
+  }
+
+  .bg-grid-light {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.08) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, black 20%, transparent 80%);
+  }
+
+  .mask-fade-x {
+    mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+  }
+
+  /* Universal press feedback for anything clickable that isn't a <Button>. */
+  .pressable {
+    transition-property: transform, color, background-color, border-color;
+    transition-duration: 160ms;
+    transition-timing-function: var(--motion-ease-out);
+  }
+  .pressable:active {
+    transform: scale(0.97);
   }
 }

@@ -1,21 +1,24 @@
-import { motion } from 'framer-motion'
+import { useRef } from 'react'
+import { motion, useScroll, useSpring } from 'framer-motion'
+import { Bot, Code2, FileUp } from 'lucide-react'
 import { CodeBlock } from '@/components/CodeBlock'
+import { Reveal, SectionHeading, Accent } from './Reveal'
 
 const steps = [
   {
-    number: '01',
+    icon: Bot,
     title: 'Create your chatbot',
-    description: 'Give it a name, tone, and personality in under a minute.',
+    description: 'Give it a name, a tone, and a personality. Takes under a minute.',
   },
   {
-    number: '02',
-    title: 'Train on your data',
-    description: 'Upload docs, paste FAQs, or link your website — Aria learns instantly.',
+    icon: FileUp,
+    title: 'Train it on your business',
+    description: 'Upload docs, paste FAQs, or link your website — it learns instantly.',
   },
   {
-    number: '03',
-    title: 'Embed one line of code',
-    description: 'Drop a single script tag on your site and you’re live.',
+    icon: Code2,
+    title: 'Paste one line of code',
+    description: 'Drop a single script tag on your site and you’re live. Works with any website builder.',
   },
 ]
 
@@ -30,48 +33,54 @@ export function HowItWorks() {
   async
 ></script>`
 
+  const stepsRef = useRef<HTMLOListElement>(null)
+  const { scrollYProgress } = useScroll({ target: stepsRef, offset: ['start 75%', 'end 55%'] })
+  // Spring-smoothed so the line has a little weight instead of tracking the
+  // scrollbar 1:1.
+  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24, restDelta: 0.001 })
+
   return (
-    <section id="how-it-works" className="scroll-mt-20 bg-slate-50 py-24">
+    <section id="how-it-works" className="scroll-mt-20 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl lg:text-5xl">
-            Live in three steps
-          </h2>
-          <p className="mt-4 text-lg text-brand-text-secondary">
-            No developer required — most teams are live before their coffee gets cold.
-          </p>
-        </div>
+        <SectionHeading
+          eyebrow="How it works"
+          title={
+            <>
+              Live on your site in <Accent>three</Accent> steps
+            </>
+          }
+          description="No developer required — most teams are live before their coffee gets cold."
+        />
 
-        <div className="mt-14 grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="space-y-8">
+        <div className="mt-16 grid gap-14 lg:grid-cols-2 lg:items-center lg:gap-20">
+          <ol ref={stepsRef} className="relative space-y-10">
+            <span className="absolute top-2 bottom-2 left-5.5 w-px bg-slate-200" aria-hidden />
+            <motion.span
+              aria-hidden
+              className="absolute top-2 bottom-2 left-5.5 w-px origin-top bg-violet-500"
+              style={{ scaleY: progress }}
+            />
             {steps.map((step, i) => (
-              <motion.div
-                key={step.number}
-                initial={{ opacity: 0, x: -16 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="flex gap-4"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-linear-to-r from-violet-600 to-violet-800 text-sm font-semibold text-white">
-                  {step.number}
+              <Reveal as="li" key={step.title} delay={i * 0.08} className="relative flex gap-5">
+                <span className="relative flex size-11 shrink-0 items-center justify-center rounded-2xl border border-violet-200 bg-white text-violet-600 shadow-sm shadow-violet-600/10">
+                  <step.icon className="size-5" />
+                </span>
+                <div className="pt-1">
+                  <p className="font-mono text-xs text-slate-400">Step {i + 1}</p>
+                  <h3 className="mt-1 text-lg font-semibold text-brand-navy">{step.title}</h3>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-brand-text-secondary">{step.description}</p>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-brand-navy">{step.title}</h3>
-                  <p className="mt-1 text-sm text-brand-text-secondary">{step.description}</p>
-                </div>
-              </motion.div>
+              </Reveal>
             ))}
-          </div>
+          </ol>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <CodeBlock code={codeSnippet} filename="index.html" className="shadow-2xl" />
-          </motion.div>
+          <Reveal delay={0.1} className="relative">
+            <div className="absolute -inset-6 -z-10 rounded-4xl bg-violet-500/10 blur-2xl" />
+            <CodeBlock code={codeSnippet} filename="index.html" copyable className="shadow-2xl shadow-slate-900/20" />
+            <p className="mt-4 text-center text-sm text-brand-text-secondary">
+              Works anywhere you can add a script tag — WordPress, Webflow, Shopify &amp; more.
+            </p>
+          </Reveal>
         </div>
       </div>
     </section>

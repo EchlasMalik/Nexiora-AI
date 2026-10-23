@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion'
 import { Languages, ShieldCheck, Sparkles } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Reveal, SectionHeading, Accent } from './Reveal'
 
 const reasons = [
   {
@@ -19,44 +18,39 @@ const reasons = [
     icon: ShieldCheck,
     title: 'Private by design',
     description:
-      'Every account’s conversations and knowledge base are fully isolated at the database level — nothing is ever shared across customers.',
+      'Every account’s conversations and knowledge base are isolated at the database level — nothing is ever shared across customers.',
   },
 ]
 
 export function WhyNexiora() {
   return (
-    <section className="py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl lg:text-5xl">
-            Built to be trusted with real conversations
-          </h2>
-          <p className="mt-4 text-lg text-brand-text-secondary">
-            The details that matter once your chatbot is talking to real customers, not just a demo.
-          </p>
-        </div>
+    <section className="relative isolate overflow-hidden bg-brand-dark-bg py-24 sm:py-32">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="bg-grid-light absolute inset-0" />
+        <div className="absolute -top-40 left-1/2 h-80 w-3xl -translate-x-1/2 rounded-full bg-violet-600/30 blur-[120px]" />
+      </div>
 
-        <div className="mt-14 grid gap-6 lg:grid-cols-3">
+      <div className="mx-auto max-w-6xl px-6">
+        <SectionHeading
+          tone="dark"
+          eyebrow="Why Nexiora"
+          title={
+            <>
+              Built to be trusted with <Accent className="text-violet-300">real</Accent> conversations
+            </>
+          }
+          description="The details that matter once your chatbot is talking to real customers, not just a demo."
+        />
+
+        <div className="mt-16 grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 lg:grid-cols-3">
           {reasons.map((reason, i) => (
-            <motion.div
-              key={reason.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: i * 0.1 }}
-            >
-              <Card className="h-full">
-                <CardContent className="flex h-full flex-col gap-4">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                    <reason.icon className="size-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-brand-navy">{reason.title}</p>
-                    <p className="mt-1.5 text-sm text-brand-text-secondary">{reason.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <Reveal key={reason.title} delay={i * 0.08} className="bg-slate-950/80 p-8 backdrop-blur">
+              <span className="flex size-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/20">
+                <reason.icon className="size-5" />
+              </span>
+              <h3 className="mt-6 text-lg font-semibold text-white">{reason.title}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-slate-400">{reason.description}</p>
+            </Reveal>
           ))}
         </div>
       </div>

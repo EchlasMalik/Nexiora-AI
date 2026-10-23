@@ -76,7 +76,7 @@ export default function Landing() {
   })
 
   return (
-    <div className="min-h-screen bg-brand-light-bg">
+    <div className="min-h-screen overflow-x-clip bg-white">
       <Navbar />
       <main>
         <Hero />

@@ -69,7 +69,7 @@ export const plans: PricingPlan[] = [
       'SLA & onboarding',
       'Dedicated account manager',
     ],
-    cta: 'Talk to staff',
+    cta: 'Talk to us',
     highlighted: false,
   },
 ]

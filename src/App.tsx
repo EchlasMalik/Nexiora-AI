@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MotionConfig } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { OrgProvider } from '@/contexts/OrgContext'
@@ -132,14 +133,18 @@ function AuthenticatedApp() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <OrgProvider>
-            <AuthenticatedApp />
-            <Toaster position="top-right" richColors />
-          </OrgProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      {/* Honour the OS "reduce motion" setting for every framer-motion animation:
+          transform/layout motion is skipped, opacity fades are kept. */}
+      <MotionConfig reducedMotion="user">
+        <BrowserRouter>
+          <AuthProvider>
+            <OrgProvider>
+              <AuthenticatedApp />
+              <Toaster position="top-right" richColors />
+            </OrgProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </MotionConfig>
     </QueryClientProvider>
   )
 }

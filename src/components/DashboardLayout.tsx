@@ -128,15 +128,16 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden"
             />
             <motion.aside
               key="drawer"
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+              initial={{ transform: 'translateX(-100%)' }}
+              animate={{ transform: 'translateX(0%)' }}
+              exit={{ transform: 'translateX(-100%)', transition: { duration: 0.25, ease: [0.32, 0.72, 0, 1] } }}
+              transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-y-0 left-0 z-50 w-64 shadow-xl lg:hidden"
             >
               <div className="flex justify-end px-3 pt-3">

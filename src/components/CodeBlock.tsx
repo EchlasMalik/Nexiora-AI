@@ -31,7 +31,7 @@ export function CodeBlock({ code, filename, copyable = false, className }: CodeB
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition-colors hover:bg-white/10"
+            className="pressable flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10"
           >
             {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
             {copied ? 'Copied' : 'Copy'}
